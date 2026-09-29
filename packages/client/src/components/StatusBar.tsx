@@ -1,7 +1,7 @@
 import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { stat } from '@tauri-apps/plugin-fs';
 import { computed, defineComponent, h, onMounted, onUnmounted, ref, watch } from 'vue';
-import { MESSAGES } from '../constants/i18n';
+import { t } from '../i18n';
 import { useFileStore, usePreferencesStore } from '../store';
 import type { EditorMode } from '../store';
 import { notifyError, notifyInfo } from '../utils/notifications';
@@ -17,11 +17,15 @@ import './status-bar.css';
  */
 type ViewMode = 'editOnly' | 'edit&preview' | 'previewOnly' | 'wysiwyg';
 
-const VIEW_MODE_OPTIONS: Array<{ value: ViewMode; label: string; title: string }> = [
-  { value: 'editOnly', label: '源码', title: '仅显示源码编辑区（Cherry · editOnly）' },
-  { value: 'edit&preview', label: '双栏', title: '源码与预览双栏（Cherry · edit&preview）' },
-  { value: 'previewOnly', label: '预览', title: '仅显示预览（Cherry · previewOnly）' },
-  { value: 'wysiwyg', label: 'WYSIWYG', title: '所见即所得编辑（Milkdown）' },
+/**
+ * 视图模式选项只保留 key，展示文案一律在渲染时用 t() 取。
+ * 若把 t() 写进模块级常量，语言切换后文案不会更新，且不会有任何报错。
+ */
+const VIEW_MODE_KEYS: Array<{ value: ViewMode; labelKey: string; titleKey: string }> = [
+  { value: 'editOnly', labelKey: 'statusBar.viewModeOptions.editOnly.label', titleKey: 'statusBar.viewModeOptions.editOnly.title' },
+  { value: 'edit&preview', labelKey: 'statusBar.viewModeOptions.editPreview.label', titleKey: 'statusBar.viewModeOptions.editPreview.title' },
+  { value: 'previewOnly', labelKey: 'statusBar.viewModeOptions.previewOnly.label', titleKey: 'statusBar.viewModeOptions.previewOnly.title' },
+  { value: 'wysiwyg', labelKey: 'statusBar.viewModeOptions.wysiwyg.label', titleKey: 'statusBar.viewModeOptions.wysiwyg.title' },
 ];
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
@@ -264,7 +268,7 @@ export default defineComponent({
 
     const fileName = computed(() => {
       const path = fileStore.currentFilePath;
-      if (!path) return '未命名';
+      if (!path) return t('statusBar.untitledFile');
       const parts = path.split(/[\\/]/);
       return parts[parts.length - 1] || path;
     });
@@ -327,14 +331,14 @@ export default defineComponent({
         await openPath(directoryPath);
       } catch (error) {
         notifyError(
-          `${MESSAGES.EXPLORER.OPEN_FAILED}: ${error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR}`,
+          `${t('file.openExplorerFailed')}: ${error instanceof Error ? error.message : t('common.unknownError')}`,
         );
         try {
           await navigator.clipboard.writeText(path);
-          notifyInfo(`${MESSAGES.CLIPBOARD.COPY_PATH_FALLBACK}: ${path}`);
+          notifyInfo(`${t('file.copyPathFallback')}: ${path}`);
         } catch (clipboardError) {
           notifyError(
-            `${MESSAGES.CLIPBOARD.COPY_PATH_FAILED}: ${clipboardError instanceof Error ? clipboardError.message : MESSAGES.UNKNOWN_ERROR}`,
+            `${t('file.copyPathFailed')}: ${clipboardError instanceof Error ? clipboardError.message : t('common.unknownError')}`,
           );
         }
       }
@@ -551,12 +555,17 @@ export default defineComponent({
     return () =>
       h('footer', { class: 'status-bar' }, [
         h('div', { class: 'status-left' }, [
-          h('span', { class: ['save-dot', { dirty: props.unsaved }], title: props.unsaved ? '未保存' : '已保存' }),
+          h('span', {
+            class: ['save-dot', { dirty: props.unsaved }],
+            title: props.unsaved ? t('common.unsaved') : t('common.saved'),
+          }),
           h(
             'span',
             {
               class: ['file-name', { clickable: Boolean(filePath.value) }],
-              title: filePath.value ? `在资源管理器中打开所在文件夹\n${filePath.value}` : fileName.value,
+              title: filePath.value
+                ? `${t('statusBar.openContainingFolder')}\n${filePath.value}`
+                : fileName.value,
               onClick: openFileInFolder,
             },
             fileName.value,
@@ -564,7 +573,10 @@ export default defineComponent({
           lastChangeTime.value
             ? h(
                 'span',
-                { class: 'file-change-time', title: `上次变更：${formatFullTime(lastChangeTime.value)}` },
+                {
+                  class: 'file-change-time',
+                  title: t('statusBar.lastChanged', { time: formatFullTime(lastChangeTime.value) }),
+                },
                 formatChangeTime(lastChangeTime.value),
               )
             : null,
@@ -578,7 +590,7 @@ export default defineComponent({
               'aria-pressed': focusMode.value,
               onClick: toggleFocusMode,
             },
-            [h(FocusIcon), h('span', { class: 'status-action-label' }, focusMode.value ? '专注中' : '专注')],
+            [h(FocusIcon), h('span', { class: 'status-action-label' }, focusMode.value ? t('statusBar.focusActive') : t('statusBar.focus'))],
           ),
           focusMode.value
             ? h(
@@ -588,13 +600,13 @@ export default defineComponent({
                   class: ['status-action', 'status-action-width'],
                   title:
                     widthMode.value === 'fixed'
-                      ? '当前：固定宽度，点击切换为 100% 宽度'
-                      : '当前：100% 宽度，点击切换为固定宽度',
+                      ? t('statusBar.widthFixedTitle')
+                      : t('statusBar.widthAutoTitle'),
                   onClick: toggleWidthMode,
                 },
                 [
                   widthMode.value === 'fixed' ? h(FixedWidthIcon) : h(AutoWidthIcon),
-                  h('span', { class: 'status-action-label' }, widthMode.value === 'fixed' ? '固定宽度' : '100% 宽度'),
+                  h('span', { class: 'status-action-label' }, widthMode.value === 'fixed' ? t('statusBar.fixedWidth') : t('statusBar.fullWidth')),
                 ],
               )
             : null,
@@ -603,20 +615,20 @@ export default defineComponent({
             {
               class: 'status-view-segment',
               role: 'group',
-              'aria-label': '视图模式',
+              'aria-label': t('statusBar.viewMode'),
             },
-            VIEW_MODE_OPTIONS.map((opt) =>
+            VIEW_MODE_KEYS.map((opt) =>
               h(
                 'button',
                 {
                   key: opt.value,
                   type: 'button',
                   class: ['status-view-segment-item', { active: activeViewMode.value === opt.value }],
-                  title: opt.title,
+                  title: t(opt.titleKey),
                   'aria-pressed': activeViewMode.value === opt.value,
                   onClick: () => applyViewMode(opt.value),
                 },
-                opt.label,
+                t(opt.labelKey),
               ),
             ),
           ),
@@ -627,9 +639,9 @@ export default defineComponent({
                 'span',
                 {
                   class: 'auto-saved-hint',
-                  title: `已自动快照，可点击「查看历史版本」进行查看\n${formatFullTime(visibleAutoSavedAt.value)}`,
+                  title: `${t('statusBar.autoSnapshotTitle')}\n${formatFullTime(visibleAutoSavedAt.value)}`,
                 },
-                [h('span', { class: 'auto-saved-dot' }), `自动快照 ${formatClockTime(visibleAutoSavedAt.value)}`],
+                [h('span', { class: 'auto-saved-dot' }), t('statusBar.autoSnapshot', { time: formatClockTime(visibleAutoSavedAt.value) })],
               )
             : null,
           visibleAutoSavedAt.value ? h('span', { class: 'status-sep' }) : null,
@@ -639,17 +651,17 @@ export default defineComponent({
                 {
                   type: 'button',
                   class: 'status-action status-action-history',
-                  title: '查看当前文件的本地历史版本',
+                  title: t('statusBar.viewHistoryTitle'),
                   onClick: () => emit('openVersionHistory'),
                 },
-                [h('span', { class: 'status-action-label' }, '查看历史版本')],
+                [h('span', { class: 'status-action-label' }, t('statusBar.viewHistory'))],
               )
             : null,
-          h('span', { class: 'status-item' }, `${wordCount.value} 字`),
+          h('span', { class: 'status-item' }, t('statusBar.charCount', { count: wordCount.value })),
           h('span', { class: 'status-sep' }),
-          h('span', { class: 'status-item' }, `${wordWords.value} 词`),
+          h('span', { class: 'status-item' }, t('statusBar.wordCount', { count: wordWords.value })),
           h('span', { class: 'status-sep' }),
-          h('span', { class: 'status-item' }, `${wordLine.value} 行`),
+          h('span', { class: 'status-item' }, t('statusBar.lineCount', { count: wordLine.value })),
         ]),
       ]);
   },

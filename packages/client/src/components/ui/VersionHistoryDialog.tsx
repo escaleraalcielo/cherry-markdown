@@ -9,6 +9,7 @@
  *   - day    → 08/25
  * 选中后点击"应用到编辑器"，通过 emit('apply', content) 由外部灌入。
  */
+import { t } from '../../i18n';
 import { computed, defineComponent, h, PropType, Teleport, Transition, ref, watch } from 'vue';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import { ask } from '@tauri-apps/plugin-dialog';
@@ -159,12 +160,12 @@ export default defineComponent({
       let confirmed = false;
       try {
         confirmed = await ask(
-          `确定要清空当前文件的全部 ${versions.value.length} 个本地历史版本吗？\n` + `此操作不可撤销。`,
+          t('versionHistory.clearConfirmMessage', { count: versions.value.length }),
           {
-            title: '清空本地历史版本',
+            title: t('versionHistory.clearConfirmTitle'),
             kind: 'warning',
-            okLabel: '清空',
-            cancelLabel: '取消',
+            okLabel: t('common.clear'),
+            cancelLabel: t('common.cancel'),
           },
         );
       } catch (err) {
@@ -205,17 +206,17 @@ export default defineComponent({
                           style: { minWidth: '640px', maxWidth: '820px', maxHeight: '80vh' },
                         },
                         [
-                          h('h3', { class: 'dialog-title' }, '本地历史版本'),
+                          h('h3', { class: 'dialog-title' }, t('versionHistory.title')),
                           h(
                             'p',
                             { class: 'dialog-message' },
-                            props.filePath ? `文件：${props.filePath}` : '当前为未命名草稿的历史版本',
+                            props.filePath ? t('versionHistory.fileLabel', { path: props.filePath }) : t('versionHistory.untitledDraft'),
                           ),
 
                           loading.value
-                            ? h('p', { class: 'dialog-message' }, '正在加载…')
+                            ? h('p', { class: 'dialog-message' }, t('versionHistory.loading'))
                             : versions.value.length === 0
-                              ? h('p', { class: 'dialog-message' }, '暂无历史版本记录。')
+                              ? h('p', { class: 'dialog-message' }, t('versionHistory.empty'))
                               : h(
                                   'div',
                                   {
@@ -296,8 +297,8 @@ export default defineComponent({
                                                   'button',
                                                   {
                                                     type: 'button',
-                                                    title: '删除此版本',
-                                                    'aria-label': '删除此版本',
+                                                    title: t('versionHistory.deleteVersion'),
+                                                    'aria-label': t('versionHistory.deleteVersion'),
                                                     onClick: (e: MouseEvent) => {
                                                       void handleDeleteOne(v.id, e);
                                                     },
@@ -388,7 +389,7 @@ export default defineComponent({
                                                     fontSize: '12px',
                                                   },
                                                 },
-                                                '差异',
+                                                t('versionHistory.diff'),
                                               ),
                                               h(
                                                 'button',
@@ -414,7 +415,7 @@ export default defineComponent({
                                                     fontSize: '12px',
                                                   },
                                                 },
-                                                '原文',
+                                                t('versionHistory.original'),
                                               ),
                                             ]),
                                             viewMode.value === 'diff' && activeVersion.value
@@ -427,7 +428,7 @@ export default defineComponent({
                                                       color: 'var(--color-text-muted, #666)',
                                                       fontSize: '11px',
                                                     },
-                                                    title: '相对于磁盘上的当前文件内容',
+                                                    title: t('versionHistory.diffTitle'),
                                                   },
                                                   [
                                                     h(
@@ -475,7 +476,7 @@ export default defineComponent({
                                                     },
                                                     activeVersion.value.content.slice(0, 20000) +
                                                       (activeVersion.value.content.length > 20000
-                                                        ? '\n\n… (仅显示前 20KB)'
+                                                        ? `\n\n${t('versionHistory.truncatedContent')}`
                                                         : ''),
                                                   ),
                                                 ]
@@ -490,7 +491,7 @@ export default defineComponent({
                                                             fontSize: '11px',
                                                           },
                                                         },
-                                                        `无法读取当前磁盘文件（按空内容对比）：${currentFileError.value}`,
+                                                        t('versionHistory.unreadableFile', { error: currentFileError.value }),
                                                       )
                                                     : null,
                                                   ...activeDiff.value.slice(0, 5000).map((line, idx) => {
@@ -538,7 +539,7 @@ export default defineComponent({
                                                             fontSize: '11px',
                                                           },
                                                         },
-                                                        `… 仅显示前 5000 行差异（共 ${activeDiff.value.length} 行）`,
+                                                        t('versionHistory.truncatedDiff', { total: activeDiff.value.length }),
                                                       )
                                                     : null,
                                                 ]
@@ -577,7 +578,7 @@ export default defineComponent({
                                     fontSize: '12px',
                                   },
                                 },
-                                '清空所有版本',
+                                t('versionHistory.clearAll'),
                               ),
                               // 右下角：应用 / 关闭
                               h('div', { style: { display: 'flex', gap: '8px' } }, [
@@ -588,9 +589,9 @@ export default defineComponent({
                                     disabled: !activeVersion.value,
                                     onClick: handleApply,
                                   },
-                                  '应用到编辑器',
+                                  t('versionHistory.apply'),
                                 ),
-                                h('button', { class: 'btn btn-secondary', onClick: handleClose }, '关闭'),
+                                h('button', { class: 'btn btn-secondary', onClick: handleClose }, t('common.close')),
                               ]),
                             ],
                           ),

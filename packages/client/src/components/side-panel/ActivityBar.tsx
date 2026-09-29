@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 import { defineComponent, h, type PropType } from 'vue';
 import { ArrowIcon, SettingsIcon } from '../icons';
 import type { ActivityPanelDefinition } from './types';
@@ -30,7 +31,7 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     return () =>
-      h('nav', { class: 'activity-bar', 'aria-label': '侧边栏功能' }, [
+      h('nav', { class: 'activity-bar', 'aria-label': t('sidePanel.activityBar') }, [
         h(
           'div',
           { class: 'activity-buttons' },
@@ -40,8 +41,8 @@ export default defineComponent({
               {
                 key: panel.id,
                 class: ['activity-btn', { active: panel.id === props.activePanelId }],
-                title: panel.label,
-                'aria-label': panel.label,
+                title: t(panel.labelKey),
+                'aria-label': t(panel.labelKey),
                 onClick: () => emit('selectPanel', panel.id),
               },
               [h(panel.icon, { size: 18 })],
@@ -53,8 +54,8 @@ export default defineComponent({
             'button',
             {
               class: 'activity-btn compact',
-              title: props.isCollapsed ? '展开侧边栏' : '折叠侧边栏',
-              'aria-label': props.isCollapsed ? '展开侧边栏' : '折叠侧边栏',
+              title: props.isCollapsed ? t('sidePanel.expand') : t('sidePanel.collapse'),
+              'aria-label': props.isCollapsed ? t('sidePanel.expand') : t('sidePanel.collapse'),
               onClick: () => emit('toggleCollapse'),
             },
             [h(ArrowIcon, { size: 14, direction: props.isCollapsed ? 'right' : 'left' })],
@@ -63,13 +64,13 @@ export default defineComponent({
             'button',
             {
               class: 'activity-btn compact',
-              title: '设置',
-              'aria-label': '设置',
+              title: t('settings.title'),
+              'aria-label': t('settings.title'),
               onClick: () => emit('openSettings'),
             },
             [h(SettingsIcon, { size: 16 })],
           ),
-          h('span', { class: 'version-text', title: '当前版本' }, `v${props.version}`),
+          h('span', { class: 'version-text', title: t('sidePanel.currentVersion') }, `v${props.version}`),
         ]),
       ]);
   },

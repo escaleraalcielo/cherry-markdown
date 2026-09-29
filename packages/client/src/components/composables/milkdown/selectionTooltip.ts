@@ -11,6 +11,7 @@ import {
 } from '@milkdown/kit/preset/commonmark';
 import { toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm';
 import { tooltipFactory, TooltipProvider } from '@milkdown/kit/plugin/tooltip';
+import { t } from '../../../i18n';
 
 /**
  * 选区工具栏（Selection Tooltip）
@@ -30,7 +31,8 @@ export const selectionTooltip = tooltipFactory('milkdown-selection');
 interface TooltipButtonSpec {
   key: string;
   label: string;
-  title: string;
+  /** i18n key；展示文案在创建按钮时用 t() 取 */
+  titleKey: string;
   markName: string; // schema.marks 里的 name，用于计算 active
   onClick: (ctx: Ctx) => void;
 }
@@ -65,7 +67,7 @@ function createButton(ctx: Ctx, spec: TooltipButtonSpec, refreshState: () => voi
   btn.type = 'button';
   btn.dataset.mark = spec.markName;
   btn.dataset.key = spec.key;
-  btn.title = spec.title;
+  btn.title = t(spec.titleKey);
   btn.innerHTML = spec.label;
   // 阻止 mousedown 让编辑器失焦（否则命令拿到的 selection 已经无效）
   btn.addEventListener('mousedown', (e) => e.preventDefault());
@@ -102,39 +104,39 @@ function buildContent(ctx: Ctx): { dom: HTMLElement; refresh: () => void } {
     {
       key: 'bold',
       label: '<b>B</b>',
-      title: '加粗 (Ctrl+B)',
+      titleKey: 'milkdown.bold',
       markName: 'strong',
       onClick: (c) => callCommand(c, toggleStrongCommand.key),
     },
     {
       key: 'italic',
       label: '<i>I</i>',
-      title: '斜体 (Ctrl+I)',
+      titleKey: 'milkdown.italic',
       markName: 'emphasis',
       onClick: (c) => callCommand(c, toggleEmphasisCommand.key),
     },
     {
       key: 'strike',
       label: '<span style="text-decoration:line-through">S</span>',
-      title: '删除线',
+      titleKey: 'milkdown.strikethrough',
       markName: 'strike_through',
       onClick: (c) => callCommand(c, toggleStrikethroughCommand.key),
     },
     {
       key: 'code',
       label: '<code style="font-family:monospace;font-size:12px">&lt;/&gt;</code>',
-      title: '行内代码',
+      titleKey: 'milkdown.inlineCode',
       markName: 'code_inline',
       onClick: (c) => callCommand(c, toggleInlineCodeCommand.key),
     },
     {
       key: 'link',
       label: '<span style="font-size:13px">🔗</span>',
-      title: '链接',
+      titleKey: 'milkdown.link',
       markName: 'link',
       onClick: (c) => {
         // toggleLinkCommand 要求 href；简单起见，弹一次原生 prompt
-        const href = window.prompt('输入链接地址', 'https://');
+        const href = window.prompt(t('milkdown.linkPrompt'), 'https://');
         if (!href) return;
         try {
           const commands = c.get(commandsCtx) as unknown as {

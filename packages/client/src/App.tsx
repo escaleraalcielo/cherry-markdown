@@ -1,4 +1,5 @@
 import { defineComponent, h, onMounted, onUnmounted, ref, watch } from 'vue';
+import { t, toBcp47 } from './i18n';
 import SidePanelManager from './components/SidePanelManager';
 import SettingsDialog from './components/ui/SettingsDialog';
 import StatusBar from './components/StatusBar';
@@ -11,7 +12,7 @@ import { useLocalVersioning } from './components/composables/useLocalVersioning'
 import ToastContainer from './components/ui/ToastContainer';
 import UnsavedChangesDialog from './components/ui/UnsavedChangesDialog';
 import VersionHistoryDialog from './components/ui/VersionHistoryDialog';
-import { useFileStore } from './store';
+import { useFileStore, usePreferencesStore } from './store';
 import { notifyInfo } from './utils/notifications';
 import { toast } from './components/composables/useToast';
 import './styles/app.css';
@@ -22,6 +23,16 @@ export default defineComponent({
     const fileStore = useFileStore();
     const unsavedGuard = useUnsavedGuard();
     const localVersioning = useLocalVersioning();
+    const preferences = usePreferencesStore();
+
+    // <html lang> 需要跟随界面语言：首屏由 main.ts 设置，
+    // 这里补上运行期切换（含从编辑器工具栏切语言的情况）。
+    watch(
+      () => preferences.locale,
+      (locale) => {
+        document.documentElement.lang = toBcp47(locale);
+      },
+    );
 
     let updateEditorTitle: (unsaved?: boolean) => void = () => undefined;
     let updateWindowTitle: (path: string | null, unsaved?: boolean) => Promise<void> = async () => undefined;
@@ -113,20 +124,20 @@ export default defineComponent({
         }
 
         restoreToastId = toast.action(
-          `发现更新的本地版本\n · 本地 ${localLabel}\n · 磁盘 ${diskLabel}`,
+          t('app.newLocalVersion', { local: localLabel, disk: diskLabel }),
           {
-            label: '应用本地版本',
+            label: t('app.applyLocalVersion'),
             onClick: () => {
               restoreToastId = -1;
               // 若切换到其他文件后再点，则不做覆盖，避免误伤
               if (fileStore.currentFilePath !== targetPath) {
-                toast.warning('当前文件已切换，忽略本次恢复');
+                toast.warning(t('app.fileSwitched'));
                 return;
               }
               editor.setMarkdown(versionContent);
               unsavedGuard.setUnsavedChanges(true);
               updateEditorTitle(true);
-              notifyInfo('已应用本地版本');
+              notifyInfo(t('app.localVersionApplied'));
             },
           },
           { type: 'warning', duration: 10000 },
@@ -141,7 +152,7 @@ export default defineComponent({
       unsavedGuard.setUnsavedChanges(true);
       updateEditorTitle(true);
       historyDialogVisible.value = false;
-      notifyInfo('已应用选中的历史版本');
+      notifyInfo(t('app.historyVersionApplied'));
     };
 
     // 切换文件时，立即关闭上一份文件残留的“发现更新的本地版本”提示。

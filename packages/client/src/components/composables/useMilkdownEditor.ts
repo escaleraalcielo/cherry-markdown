@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { t } from '../../i18n';
 import type { CherryEditorMode } from '../editorTypes';
 
 /**
@@ -67,10 +68,10 @@ export function useMilkdownEditor({ onContentChanged }: UseMilkdownEditorOptions
       if (el && !el.hasChildNodes()) {
         el.innerHTML =
           '<div style="padding:24px;color:var(--fg-secondary,#888);font-size:14px;line-height:1.7;">' +
-          '<b>Milkdown 引擎尚未接入</b><br/>' +
-          '这里将在完成 <code>npm i @milkdown/kit @milkdown/theme-nord</code> ' +
-          '并实现 <code>milkdownAdapter.ts</code> 后启用所见即所得编辑。<br/><br/>' +
-          '切回 Cherry 引擎可继续正常编辑。' +
+          `<b>${t('milkdown.notIntegratedTitle')}</b><br/>` +
+          `${t('milkdown.notIntegratedBody1')} ` +
+          `${t('milkdown.notIntegratedBody2')}<br/><br/>` +
+          `${t('milkdown.notIntegratedBody3')}` +
           '</div>';
       }
       return;

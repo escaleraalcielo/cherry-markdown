@@ -4,6 +4,7 @@ import { NodeSelection, TextSelection } from '@milkdown/kit/prose/state';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import { block, BlockProvider } from '@milkdown/kit/plugin/block';
 import { turnIntoTextCommand, wrapInBlockquoteCommand } from '@milkdown/kit/preset/commonmark';
+import { t } from '../../../i18n';
 
 /**
  * 段落把手（Block Handle）
@@ -50,7 +51,8 @@ function callCommand(ctx: Ctx, key: unknown, payload?: unknown): void {
 }
 
 interface BlockMenuItem {
-  label: string;
+  /** i18n key；展示文案在构建菜单时用 t() 取 */
+  labelKey: string;
   danger?: boolean;
   onSelect: (ctx: Ctx, view: EditorView, provider: BlockProvider) => void;
 }
@@ -71,28 +73,28 @@ function buildMenu(
 
   const items: BlockMenuItem[] = [
     {
-      label: '转为段落',
+      labelKey: 'milkdown.toParagraph',
       onSelect: (c, view) => {
         selectBlock(view, providerRef.current);
         callCommand(c, turnIntoTextCommand.key);
       },
     },
     {
-      label: '转为引用',
+      labelKey: 'milkdown.toQuote',
       onSelect: (c, view) => {
         selectBlock(view, providerRef.current);
         callCommand(c, wrapInBlockquoteCommand.key);
       },
     },
     {
-      label: '复制段落',
+      labelKey: 'milkdown.copyParagraph',
       onSelect: (_c, view) => {
         copyBlock(view, providerRef.current);
       },
     },
-    { label: '__DIVIDER__', onSelect: () => undefined },
+    { labelKey: '__DIVIDER__', onSelect: () => undefined },
     {
-      label: '删除段落',
+      labelKey: 'milkdown.deleteParagraph',
       danger: true,
       onSelect: (_c, view) => {
         deleteBlock(view, providerRef.current);
@@ -101,7 +103,7 @@ function buildMenu(
   ];
 
   items.forEach((item) => {
-    if (item.label === '__DIVIDER__') {
+    if (item.labelKey === '__DIVIDER__') {
       const d = document.createElement('div');
       d.className = 'milkdown-block-menu-divider';
       dom.appendChild(d);
@@ -109,7 +111,7 @@ function buildMenu(
     }
     const el = document.createElement('div');
     el.className = 'milkdown-block-menu-item';
-    el.textContent = item.label;
+    el.textContent = item.labelKey === '__DIVIDER__' ? '' : t(item.labelKey);
     if (item.danger) el.dataset.danger = 'true';
     el.addEventListener('mousedown', (e) => e.preventDefault());
     el.addEventListener('click', () => {
@@ -190,7 +192,7 @@ function buildHandle(onMenu: (rect: DOMRect) => void): HTMLElement {
   const el = document.createElement('div');
   el.className = 'milkdown-block-handle';
   el.dataset.show = 'false';
-  el.title = '拖动此处移动段落，或点击展开操作';
+  el.title = t('milkdown.dragHandle');
   const dots = document.createElement('div');
   dots.className = 'milkdown-block-handle-dots';
   for (let i = 0; i < 6; i += 1) dots.appendChild(document.createElement('span'));

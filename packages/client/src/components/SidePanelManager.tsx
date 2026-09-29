@@ -1,4 +1,5 @@
 import { computed, defineComponent, h, ref, shallowRef, type Component } from 'vue';
+import { t } from '../i18n';
 import ExplorerPanel from './ExplorerPanel';
 import RecentPanel from './RecentPanel';
 import { FileIcon, FolderIcon, LocateIcon, NewFileIcon, OpenFileIcon, OpenFolderIcon, RefreshIcon } from './icons';
@@ -43,12 +44,12 @@ export default defineComponent({
     const panels = shallowRef<PanelDefinition[]>([
       {
         id: 'explorer',
-        label: '资源管理器',
+        labelKey: 'sidePanel.explorer',
         subtitle: '',
         icon: FolderIcon,
         component: ExplorerPanel,
       },
-      { id: 'recent', label: '最近文件', subtitle: '', icon: FileIcon, component: RecentPanel },
+      { id: 'recent', labelKey: 'sidePanel.recent', subtitle: '', icon: FileIcon, component: RecentPanel },
     ]);
     const panelIds = computed(() => panels.value.map((panel) => panel.id));
     const panelRef = ref<PanelExposeApi | null>(null);
@@ -71,22 +72,22 @@ export default defineComponent({
     const activePanelActions = computed<PanelHeaderAction[]>(() => {
       if (activePanelId.value === 'explorer') {
         return [
-          { id: 'new-file', label: '新建文件', icon: NewFileIcon },
-          { id: 'open-directory', label: '打开目录', icon: OpenFolderIcon },
-          { id: 'refresh-directory', label: '刷新目录', icon: RefreshIcon },
+          { id: 'new-file', labelKey: 'file.new', icon: NewFileIcon },
+          { id: 'open-directory', labelKey: 'explorer.openDirectory', icon: OpenFolderIcon },
+          { id: 'refresh-directory', labelKey: 'sidePanel.refreshDirectory', icon: RefreshIcon },
           {
             id: 'reveal-current',
-            label: '定位当前文件',
+            labelKey: 'sidePanel.revealFile',
             icon: LocateIcon,
             disabled: !fileStore.currentFilePath,
-            disabledReason: '当前没有打开的文件',
+            disabledReasonKey: 'explorer.noOpenFile',
           },
         ];
       }
 
       return [
-        { id: 'open-file', label: '打开文件', icon: OpenFileIcon },
-        { id: 'new-file', label: '新建文件', icon: NewFileIcon },
+        { id: 'open-file', labelKey: 'file.openFile', icon: OpenFileIcon },
+        { id: 'new-file', labelKey: 'file.new', icon: NewFileIcon },
       ];
     });
 
@@ -126,7 +127,7 @@ export default defineComponent({
           !isCollapsed.value
             ? h('section', { class: 'panel-surface', style: { width: `${panelWidth.value}px` } }, [
                 h(PanelHeader, {
-                  title: panel?.label || '',
+                  title: panel?.labelKey ? t(panel.labelKey) : '',
                   subtitle: panel?.subtitle,
                   actions: activePanelActions.value,
                   onAction: handlePanelAction,

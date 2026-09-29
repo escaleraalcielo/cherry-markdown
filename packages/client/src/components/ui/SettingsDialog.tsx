@@ -2,12 +2,14 @@ import { defineComponent, h, Teleport, Transition, ref, computed, watch } from '
 import { useImageBedStore, usePreferencesStore, type ImageBedProvider, type ImageBedState } from '../../store';
 import { FIXED_WIDTH_DEFAULT, FIXED_WIDTH_MAX, FIXED_WIDTH_MIN } from '../../store/modal/preferences';
 import { testImageBedConnection } from '../composables/useImageBedUploader';
+import { t } from '../../i18n';
+import { SUPPORTED_LOCALES, LOCALE_LABELS, type AppLocale } from '../../i18n';
 import './settings-dialog.css';
 
-const PROVIDER_OPTIONS: Array<{ value: ImageBedProvider; label: string; hint: string }> = [
-  { value: 'none', label: '禁用（Base64 内联）', hint: '不使用图床，图片以 base64 内联到 markdown' },
-  { value: 'picgo', label: 'PicGo Server', hint: '本地运行 PicGo，通过 HTTP 接口上传' },
-  { value: 'custom', label: '自定义 HTTP 上传', hint: '任意支持 multipart/form-data 的上传接口' },
+const PROVIDER_OPTIONS: Array<{ value: ImageBedProvider; labelKey: string; hintKey: string }> = [
+  { value: 'none', labelKey: 'settings.providers.none.label', hintKey: 'settings.providers.none.hint' },
+  { value: 'picgo', labelKey: 'settings.providers.picgo.label', hintKey: 'settings.providers.picgo.hint' },
+  { value: 'custom', labelKey: 'settings.providers.custom.label', hintKey: 'settings.providers.custom.hint' },
 ];
 
 type TestResult = { ok: boolean; message: string } | null;
@@ -73,6 +75,18 @@ export default defineComponent({
       emit('close');
     };
 
+    /**
+     * 语言与其它设置不同：立即生效，不走「草稿 → 保存」的流程。
+     * 这样用户在选择的过程中就能看到界面语言跟着变，选择器本身是自解释的。
+     * store 的 setLocale 会负责持久化，并把语言推送给编辑器。
+     */
+    const handleLocaleChange = (event: Event): void => {
+      const value = (event.target as HTMLSelectElement).value;
+      if (value === 'zh_CN' || value === 'en_US') {
+        preferences.setLocale(value as AppLocale);
+      }
+    };
+
     const addHeader = (): void => {
       draft.value.custom.headers = [...draft.value.custom.headers, { key: '', value: '' }];
     };
@@ -99,19 +113,37 @@ export default defineComponent({
                     },
                     [
                       h('div', { class: 'dialog-content settings-dialog' }, [
-                        h('h3', { class: 'dialog-title' }, '设置'),
+                        h('h3', { class: 'dialog-title' }, t('settings.title')),
+
+                        // ==== 语言分节 ====
+                        h('section', { class: 'settings-section' }, [
+                          h('h4', { class: 'settings-section-title' }, t('settings.language')),
+                          h('p', { class: 'settings-section-desc' }, t('settings.languageDesc')),
+                          h('div', { class: 'settings-form' }, [
+                            h('label', { class: 'settings-field' }, [
+                              h('span', { class: 'settings-field-label' }, t('settings.language')),
+                              h(
+                                'select',
+                                {
+                                  class: 'settings-input',
+                                  value: preferences.locale,
+                                  onChange: handleLocaleChange,
+                                },
+                                SUPPORTED_LOCALES.map((locale) =>
+                                  h('option', { key: locale, value: locale }, LOCALE_LABELS[locale]),
+                                ),
+                              ),
+                            ]),
+                          ]),
+                        ]),
 
                         // ==== 专注模式分节 ====
                         h('section', { class: 'settings-section' }, [
-                          h('h4', { class: 'settings-section-title' }, '专注模式'),
-                          h(
-                            'p',
-                            { class: 'settings-section-desc' },
-                            '专注模式下，正文采用居中固定宽度布局，便于阅读。可在下方自定义宽度，修改后立即生效。',
-                          ),
+                          h('h4', { class: 'settings-section-title' }, t('settings.focusMode')),
+                          h('p', { class: 'settings-section-desc' }, t('settings.focusModeDesc')),
                           h('div', { class: 'settings-form' }, [
                             h('label', { class: 'settings-field' }, [
-                              h('span', { class: 'settings-field-label' }, `固定宽度（px）`),
+                              h('span', { class: 'settings-field-label' }, t('settings.fixedWidth')),
                               h('input', {
                                 class: 'settings-input',
                                 type: 'number',
@@ -128,7 +160,11 @@ export default defineComponent({
                               h(
                                 'span',
                                 { class: 'settings-field-hint' },
-                                `建议范围 ${FIXED_WIDTH_MIN} – ${FIXED_WIDTH_MAX}，默认 ${FIXED_WIDTH_DEFAULT}。仅在“固定宽度”模式下生效，100% 宽度不受影响。`,
+                                t('settings.fixedWidthHint', {
+                                  min: FIXED_WIDTH_MIN,
+                                  max: FIXED_WIDTH_MAX,
+                                  default: FIXED_WIDTH_DEFAULT,
+                                }),
                               ),
                             ]),
                           ]),
@@ -136,11 +172,11 @@ export default defineComponent({
 
                         // ==== 图床设置分节 ====
                         h('section', { class: 'settings-section' }, [
-                          h('h4', { class: 'settings-section-title' }, '图床'),
+                          h('h4', { class: 'settings-section-title' }, t('settings.imageBed')),
                           h(
                             'p',
                             { class: 'settings-section-desc' },
-                            '选择上传图片时使用的图床。修改后立即生效，无需重启。',
+                            t('settings.imageBedDesc'),
                           ),
 
                           // Provider radio group
@@ -165,8 +201,8 @@ export default defineComponent({
                                     },
                                   }),
                                   h('div', { class: 'settings-provider-text' }, [
-                                    h('div', { class: 'settings-provider-label' }, opt.label),
-                                    h('div', { class: 'settings-provider-hint' }, opt.hint),
+                                    h('div', { class: 'settings-provider-label' }, t(opt.labelKey)),
+                                    h('div', { class: 'settings-provider-hint' }, t(opt.hintKey)),
                                   ]),
                                 ],
                               ),
@@ -177,7 +213,7 @@ export default defineComponent({
                           draft.value.provider === 'picgo'
                             ? h('div', { class: 'settings-form' }, [
                                 h('label', { class: 'settings-field' }, [
-                                  h('span', { class: 'settings-field-label' }, 'PicGo Server 上传地址'),
+                                  h('span', { class: 'settings-field-label' }, t('settings.picgoUrl')),
                                   h('input', {
                                     class: 'settings-input',
                                     type: 'text',
@@ -190,7 +226,7 @@ export default defineComponent({
                                   h(
                                     'span',
                                     { class: 'settings-field-hint' },
-                                    '本地需先启动 PicGo 桌面客户端并在 "PicGo Server" 设置中打开监听。',
+                                    t('settings.picgoUrlHint'),
                                   ),
                                 ]),
                               ])
@@ -200,7 +236,7 @@ export default defineComponent({
                           draft.value.provider === 'custom'
                             ? h('div', { class: 'settings-form' }, [
                                 h('label', { class: 'settings-field' }, [
-                                  h('span', { class: 'settings-field-label' }, '上传 URL'),
+                                  h('span', { class: 'settings-field-label' }, t('settings.uploadUrl')),
                                   h('input', {
                                     class: 'settings-input',
                                     type: 'text',
@@ -212,7 +248,7 @@ export default defineComponent({
                                   }),
                                 ]),
                                 h('label', { class: 'settings-field' }, [
-                                  h('span', { class: 'settings-field-label' }, '表单字段名'),
+                                  h('span', { class: 'settings-field-label' }, t('settings.formField')),
                                   h('input', {
                                     class: 'settings-input',
                                     type: 'text',
@@ -225,11 +261,11 @@ export default defineComponent({
                                   h(
                                     'span',
                                     { class: 'settings-field-hint' },
-                                    'multipart/form-data 中承载文件的字段名，多数服务为 file / image。',
+                                    t('settings.formFieldHint'),
                                   ),
                                 ]),
                                 h('label', { class: 'settings-field' }, [
-                                  h('span', { class: 'settings-field-label' }, '响应 URL 字段路径'),
+                                  h('span', { class: 'settings-field-label' }, t('settings.responseUrlPath')),
                                   h('input', {
                                     class: 'settings-input',
                                     type: 'text',
@@ -242,12 +278,12 @@ export default defineComponent({
                                   h(
                                     'span',
                                     { class: 'settings-field-hint' },
-                                    '响应为 JSON 时，用点号路径提取最终图片 URL，例如 data.url、result.0.url。',
+                                    t('settings.responseUrlPathHint'),
                                   ),
                                 ]),
                                 h('div', { class: 'settings-field' }, [
                                   h('div', { class: 'settings-headers-header' }, [
-                                    h('span', { class: 'settings-field-label' }, '自定义请求头'),
+                                    h('span', { class: 'settings-field-label' }, t('settings.customHeaders')),
                                     h(
                                       'button',
                                       {
@@ -255,7 +291,7 @@ export default defineComponent({
                                         type: 'button',
                                         onClick: addHeader,
                                       },
-                                      '+ 添加',
+                                      t('common.add'),
                                     ),
                                   ]),
                                   ...draft.value.custom.headers.map((header, index) =>
@@ -264,7 +300,7 @@ export default defineComponent({
                                         class: 'settings-input',
                                         type: 'text',
                                         value: header.key,
-                                        placeholder: 'Header 名，如 Authorization',
+                                        placeholder: t('settings.headerNamePlaceholder'),
                                         onInput: (e: Event) => {
                                           draft.value.custom.headers[index].key = (e.target as HTMLInputElement).value;
                                         },
@@ -273,7 +309,7 @@ export default defineComponent({
                                         class: 'settings-input',
                                         type: 'text',
                                         value: header.value,
-                                        placeholder: 'Header 值',
+                                        placeholder: t('settings.headerValuePlaceholder'),
                                         onInput: (e: Event) => {
                                           draft.value.custom.headers[index].value = (
                                             e.target as HTMLInputElement
@@ -287,7 +323,7 @@ export default defineComponent({
                                           type: 'button',
                                           onClick: () => removeHeader(index),
                                         },
-                                        '删除',
+                                        t('common.delete'),
                                       ),
                                     ]),
                                   ),
@@ -306,7 +342,7 @@ export default defineComponent({
                                     disabled: testing.value,
                                     onClick: handleTest,
                                   },
-                                  testing.value ? '测试中…' : '测试连接',
+                                  t(testing.value ? 'settings.testing' : 'settings.testConnection'),
                                 ),
                                 testResult.value
                                   ? h(
@@ -323,8 +359,8 @@ export default defineComponent({
 
                         // ==== 底部操作按钮 ====
                         h('div', { class: 'dialog-actions' }, [
-                          h('button', { class: 'btn btn-primary', onClick: handleSave }, '保存'),
-                          h('button', { class: 'btn btn-secondary', onClick: handleCancel }, '取消'),
+                          h('button', { class: 'btn btn-primary', onClick: handleSave }, t('common.save')),
+                          h('button', { class: 'btn btn-secondary', onClick: handleCancel }, t('common.cancel')),
                         ]),
                       ]),
                     ],

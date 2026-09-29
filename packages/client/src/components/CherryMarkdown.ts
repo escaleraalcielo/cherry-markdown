@@ -19,6 +19,7 @@ import { getCurrentLightbox } from './composables/useImageLightbox';
 import { createImageBedFileUpload, createImageBedOnPaste } from './composables/useImageBedUploader';
 import { runCherryExport, type ExportType } from './composables/useCherryExport';
 import { usePreferencesStore, type EditorMode } from '../store';
+import { t } from '../i18n';
 
 /**
  * ECharts类型兼容性处理
@@ -35,6 +36,17 @@ const toPinyin = (text: string) => pinyin(text, { style: pinyin.STYLE_TONE, hete
 
 type CherryMenuHook = ReturnType<typeof Cherry.createMenuHook>;
 type ToolbarRightConfig = NonNullable<CherryOptions<CustomConfig>['toolbars']>['toolbarRight'];
+type ToolbarItem = Exclude<
+  NonNullable<NonNullable<CherryOptions<CustomConfig>['toolbars']>['toolbar']>,
+  false
+>[number];
+
+/**
+ * core 内部确实注册了 changeLocale 这个内置钩子（见 HookCenter.js 的 HookList），
+ * 但上游的 CherryDefaultToolbar 联合类型没有收录它，属于类型定义的遗漏。
+ * 这里做一次局部断言；上游补齐类型后即可删除这段。
+ */
+const CHANGE_LOCALE_HOOK = 'changeLocale' as unknown as ToolbarItem;
 
 interface ToolbarMenuHookContext {
   $cherry: Pick<CherryEditorInstance, 'getMarkdown' | 'switchModel' | 'focusMode' | 'wrapperDom'> & {
@@ -58,7 +70,20 @@ type CustomConfig = {
 // but runtime supports them through customMenu registration.
 const toolbarRight = [] as unknown as ToolbarRightConfig;
 
-const customMenuChangeModule = Cherry.createMenuHook('编辑', {
+/** 主题短名清单；展示文案在实例化时按当前语言注入 */const THEME_OPTIONS = [
+  { className: 'default' }, // 曾用名：light 明亮
+  { className: 'dark' },
+  { className: 'green' },
+  { className: 'red' },
+  { className: 'violet' },
+  { className: 'blue' },
+] as const;
+
+// 自定义菜单的展示名走 core 的补充语言包（见 cherryConfig.locales）：
+// MenuBase 渲染按钮时取 this.locale[this.name]，因此这里用中性的 key，
+// 由 core 依当前语言翻译出「编辑 / Edit」。注意这些 key 不能随意改动，
+// 它们同时参与 CSS 类名与图标选择器的匹配。
+const customMenuChangeModule = Cherry.createMenuHook('clientEdit', {
   iconName: 'pen' as const,
   onClick(this: ToolbarMenuHookContext) {
     const { editor } = this.$cherry.getStatus();
@@ -90,7 +115,7 @@ const customMenuChangeModule = Cherry.createMenuHook('编辑', {
   },
 });
 
-const customSave = Cherry.createMenuHook('保存', {
+const customSave = Cherry.createMenuHook('clientSave', {
   icon: {
     // type: 'svg',
     // iconStyle: 'width:16px;height:16px;',
@@ -137,7 +162,7 @@ interface ExportMenuInstance {
   bindSubClick(shortcut: string, selection?: string): unknown;
 }
 
-const customExport = Cherry.createMenuHook('导出', {
+const customExport = Cherry.createMenuHook('clientExport', {
   iconName: 'download' as const,
   // 先占位（name 走主包 i18n），具体 onclick 在 afterInit 里用菜单实例重新绑定
   subMenuConfig: [
@@ -310,7 +335,8 @@ const cherryConfig: CherryOptions<CustomConfig> = {
     codemirror: {
       // 是否自动focus 默认为true
       autofocus: false,
-      placeholder: '输入文本或「/」开始编辑',
+      // 默认值在 cherryInstance() 里按当前语言覆盖
+      placeholder: t('editor.placeholder'),
     },
     writingStyle: 'normal', // 书写风格，normal 普通 | typewriter 打字机 | focus 专注，默认normal
     keepDocumentScrollAfterInit: false, // 在初始化后是否保持网页的滚动，true：保持滚动；false：网页自动滚动到cherry初始化的位置
@@ -360,6 +386,11 @@ const cherryConfig: CherryOptions<CustomConfig> = {
       '|',
       'search',
       'shortcutKey',
+      '|',
+      // 语言切换：复用 core 内置的 ChangeLocale 工具栏钩子。
+      // 由 core 负责自身的工具栏重渲染，客户端只监听 afterChangeLocale 事件
+      // 把语言同步给偏好 store，从而带动整个界面一起切换。
+      CHANGE_LOCALE_HOOK,
     ],
     toolbarRight,
     bubble: ['bold', 'italic', 'underline', 'strikethrough', 'sub', 'sup', 'quote', 'ruby', '|', 'size', 'color'], // array or false
@@ -491,15 +522,11 @@ const cherryConfig: CherryOptions<CustomConfig> = {
   /** 定义cherry缓存的作用范围，相同nameSpace的实例共享localStorage缓存 */
   nameSpace: 'cherry',
   themeSettings: {
-    // 主题列表，用于切换主题
-    themeList: [
-      { className: 'default', label: '明亮' }, // 曾用名：light 明亮
-      { className: 'dark', label: '暗黑' },
-      { className: 'green', label: '清新' },
-      { className: 'red', label: '热情' },
-      { className: 'violet', label: '淡雅' },
-      { className: 'blue', label: '清幽' },
-    ],
+    // 主题列表，用于切换主题；label 在实例化时按当前语言注入（见 cherryInstance）
+    themeList: THEME_OPTIONS.map((theme) => ({
+      className: theme.className,
+      label: t(`editor.themes.${theme.className}`),
+    })),
     mainTheme: 'violet',
     codeBlockTheme: 'twilight',
     inlineCodeTheme: 'red', // red or black
@@ -511,9 +538,23 @@ const cherryConfig: CherryOptions<CustomConfig> = {
   // 外层容器不存在时，是否强制输出到body上
   forceAppend: false,
   // The locale Cherry is going to use. Locales live in /src/locales/
-  locale: 'zh_CN',
-  // Supplementary locales
-  locales: {},
+  // 实际取值在 cherryInstance() 里从偏好 store 注入，这里只是占位默认值。
+  locale: 'zh_CN' as string,
+  // 补充语言包：为客户端自定义菜单提供 core 内置语言包之外的文案。
+  // MenuBase 渲染按钮标题时会查 this.locale[this.name]，因此这些 key 必须与
+  // 上方 createMenuHook 的第一个参数保持一致。
+  locales: {
+    zh_CN: {
+      clientEdit: '编辑',
+      clientSave: '保存',
+      clientExport: '导出',
+    },
+    en_US: {
+      clientEdit: 'Edit',
+      clientSave: 'Save',
+      clientExport: 'Export',
+    },
+  } as Record<string, Record<string, string>>,
   // cherry初始化后是否检查 location.hash 尝试滚动到对应位置
   autoScrollByHashAfterInit: false,
 };
@@ -529,6 +570,22 @@ export const cherryInstance = (() => {
       const prefs = usePreferencesStore();
       if (cherryConfig.editor) {
         cherryConfig.editor.defaultModel = prefs.editorMode;
+      }
+      // 编辑器语言跟随界面语言，避免出现「工具栏中文 + 外壳英文」的混排
+      cherryConfig.locale = prefs.locale;
+      // 下列文案在 Cherry 构造时读取，模块级无法拿到运行时的语言，
+      // 因此在实例化时按当前语言注入。语言切换后 CodeMirror 的 placeholder
+      // 与主题下拉需要编辑器重建才会刷新，故一并写回配置。
+      if (cherryConfig.editor?.codemirror) {
+        // codemirror 在上游类型里是 object，这里按已知形状收窄
+        (cherryConfig.editor.codemirror as { placeholder?: string }).placeholder =
+          t('editor.placeholder');
+      }
+      if (cherryConfig.themeSettings) {
+        cherryConfig.themeSettings.themeList = THEME_OPTIONS.map((theme) => ({
+          className: theme.className,
+          label: t(`editor.themes.${theme.className}`),
+        }));
       }
     } catch {
       // pinia 未就绪时使用默认配置

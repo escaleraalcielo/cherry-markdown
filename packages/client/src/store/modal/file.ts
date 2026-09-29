@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '../../i18n';
 
 import type { FileInfo } from '../../components/types';
 
@@ -127,7 +128,7 @@ export const useFileStore = defineStore('file', {
       this.currentFilePath = null;
       this.untitledDraft = {
         path: UNTITLED_DRAFT_PATH,
-        name: '未命名.md',
+        name: t('file.untitledName'),
         lastAccessed: now,
         lastOpened: now,
         lastSaved: null,

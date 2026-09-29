@@ -14,6 +14,8 @@ import App from './App';
 import cherryMarkdownCss from 'cherry-markdown/dist/cherry-markdown.css?inline';
 import globalCss from './styles/global.css?inline';
 import { createPinia } from 'pinia';
+import { usePreferencesStore } from './store';
+import { setActiveLocale, toBcp47 } from './i18n';
 
 // Side-effect: register Milkdown adapter so switching engine via StatusBar
 // can boot a real Milkdown editor. Placed after the CSS injection so that
@@ -33,6 +35,12 @@ injectStyle(cherryMarkdownCss, 'cherry-markdown');
 injectStyle(globalCss, 'client-global');
 
 const pinia = createPinia();
+
+// 把持久化的语言偏好灌进 i18n 运行时，并同步 <html lang>，
+// 让首屏文案与无障碍属性都与实际语言一致。
+const preferences = usePreferencesStore(pinia);
+setActiveLocale(preferences.locale);
+document.documentElement.lang = toBcp47(preferences.locale);
 
 const app = createApp(App);
 app.use(pinia);

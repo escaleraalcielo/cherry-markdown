@@ -1,3 +1,4 @@
+import { t, getActiveLocale, toBcp47 } from '../../i18n';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, writeFile } from '@tauri-apps/plugin-fs';
 import html2canvas from 'html2canvas';
@@ -140,7 +141,7 @@ const collectDocumentStyles = (): string => {
 };
 
 const buildFullHtmlDocument = (bodyHtml: string, title: string, previewDom?: HTMLElement | null): string => {
-  const lang = typeof navigator !== 'undefined' ? navigator.language || 'en' : 'en';
+  const lang = toBcp47(getActiveLocale());
   const styles = collectDocumentStyles();
 
   // 保留 previewer 及其 .cherry 祖先容器上的类名（主题、宽度模式等），
@@ -199,7 +200,7 @@ const exportMarkdown = async (cherry: CherryLikeInstance, fileName: string): Pro
   const path = await askSavePath(fileName, 'md', 'Markdown');
   if (!path) return;
   await writeTextFile(path, cherry.getMarkdown());
-  notifySuccess(`已导出 Markdown：${path}`);
+  notifySuccess(t('exportAction.exportedMarkdown', { path }));
 };
 
 const exportHtml = async (cherry: CherryLikeInstance, fileName: string): Promise<void> => {
@@ -207,12 +208,12 @@ const exportHtml = async (cherry: CherryLikeInstance, fileName: string): Promise
   if (!path) return;
   // collectDocumentStyles 会遍历所有 styleSheet.cssRules，大文档 + 主题较多时可能耗时 100~500ms，
   // 加 loading 避免用户以为按钮没响应；快时 toast 一闪而过也不影响体验。
-  const loadingId = notifyLoading('正在生成 HTML…');
+  const loadingId = notifyLoading(t('exportAction.generatingHtml'));
   try {
     const previewDom = cherry.previewer.getDomContainer();
     const fullHtml = buildFullHtmlDocument(cherry.previewer.getValue(), fileName, previewDom);
     await writeTextFile(path, fullHtml);
-    notifySuccess(`已导出 HTML：${path}`);
+    notifySuccess(t('exportAction.exportedHtml', { path }));
   } finally {
     dismissNotify(loadingId);
   }
@@ -226,7 +227,7 @@ const exportHtml = async (cherry: CherryLikeInstance, fileName: string): Promise
 const exportPdf = (cherry: CherryLikeInstance, fileName: string): void => {
   const previewDom = cherry.previewer.getDomContainer();
   if (!previewDom) {
-    notifyError('未找到预览区域，无法打印');
+    notifyError(t('exportAction.noPreviewForPrint'));
     return;
   }
 
@@ -302,7 +303,7 @@ const canvasToUint8Array = (canvas: HTMLCanvasElement): Promise<Uint8Array> =>
   new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob) {
-        reject(new Error('canvas.toBlob 返回空'));
+        reject(new Error(t('exportAction.canvasToBlobEmpty')));
         return;
       }
       blob
@@ -319,7 +320,7 @@ const blobToDataUrl = (blob: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ''));
-    reader.onerror = () => reject(reader.error ?? new Error('FileReader 读取失败'));
+    reader.onerror = () => reject(reader.error ?? new Error(t('exportAction.fileReaderFailed')));
     reader.readAsDataURL(blob);
   });
 
@@ -341,7 +342,7 @@ const imgToDataUrlViaCanvas = (src: string): Promise<string> =>
         canvas.height = img.naturalHeight || img.height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          reject(new Error('2d ctx 创建失败'));
+          reject(new Error(t('exportAction.ctx2dFailed')));
           return;
         }
         ctx.drawImage(img, 0, 0);
@@ -351,7 +352,7 @@ const imgToDataUrlViaCanvas = (src: string): Promise<string> =>
         reject(err instanceof Error ? err : new Error(String(err)));
       }
     };
-    img.onerror = () => reject(new Error(`<img> 加载失败: ${src}`));
+    img.onerror = () => reject(new Error(t('exportAction.imgLoadFailed', { src })));
     img.src = src;
   });
 
@@ -437,7 +438,7 @@ const inlineImagesAsDataURL = async (root: HTMLElement): Promise<void> => {
 const exportScreenShot = async (cherry: CherryLikeInstance, fileName: string): Promise<void> => {
   const previewDom = cherry.previewer.getDomContainer();
   if (!previewDom) {
-    notifyError('未找到预览区域，无法截图');
+    notifyError(t('exportAction.noPreviewForScreenshot'));
     return;
   }
 
@@ -446,7 +447,7 @@ const exportScreenShot = async (cherry: CherryLikeInstance, fileName: string): P
 
   // 长图导出主要慢在：图片跨域抓取（inlineImagesAsDataURL）+ 分片 html2canvas 渲染；
   // 长文档可能 5~30s。用持久 toast 提示，finally 里主动关闭。
-  const loadingId = notifyLoading('正在生成长图，请稍候…');
+  const loadingId = notifyLoading(t('exportAction.generatingLongImage'));
 
   // 克隆一份预览区到 body，避免影响原始 DOM 布局
   const clone = previewDom.cloneNode(true) as HTMLElement;
@@ -585,7 +586,7 @@ const exportScreenShot = async (cherry: CherryLikeInstance, fileName: string): P
     mainCanvas.width = Math.round(fullWidth * scale);
     mainCanvas.height = Math.round(fullHeight * scale);
     const ctx = mainCanvas.getContext('2d');
-    if (!ctx) throw new Error('无法创建 2d 上下文');
+    if (!ctx) throw new Error(t('exportAction.ctxCreateFailed'));
 
     const commonOptions = {
       allowTaint: false,
@@ -617,7 +618,7 @@ const exportScreenShot = async (cherry: CherryLikeInstance, fileName: string): P
 
     const bytes = await canvasToUint8Array(mainCanvas);
     await writeFile(path, bytes);
-    notifySuccess(`已导出长图：${path}`);
+    notifySuccess(t('exportAction.exportedLongImage', { path }));
   } finally {
     wrapper.remove();
     document.body.style.overflow = bodyOverflow;
@@ -727,7 +728,7 @@ const docxResultToUint8Array = async (result: unknown): Promise<Uint8Array> => {
     const b = result as { buffer: ArrayBufferLike; byteOffset?: number; byteLength?: number };
     return new Uint8Array(b.buffer, b.byteOffset ?? 0, b.byteLength);
   }
-  throw new Error('asBlob 返回了无法识别的类型');
+  throw new Error(t('exportAction.asBlobUnknownType'));
 };
 
 /**
@@ -763,7 +764,7 @@ const exportWord = async (cherry: CherryLikeInstance, fileName: string): Promise
 
   // asBlob 内部要把整份 HTML 打包成 MHT + zip，大文档 1~5s；
   // 首次调用还需动态 import jszip（~100KB），加 loading 提示。
-  const loadingId = notifyLoading('正在生成 Word 文档…');
+  const loadingId = notifyLoading(t('exportAction.generatingWord'));
   try {
     // 动态 import 减小首屏体积；html-docx-js-typescript 纯浏览器实现，Vite 直接可用
     const { asBlob } = await import('html-docx-js-typescript');
@@ -773,15 +774,15 @@ const exportWord = async (cherry: CherryLikeInstance, fileName: string): Promise
     });
     const bytes = await docxResultToUint8Array(result);
     await writeFile(path, bytes);
-    notifySuccess(`已导出 Word：${path}`);
+    notifySuccess(t('exportAction.exportedWord', { path }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn('[exportWord] asBlob failed, fallback to clipboard', error);
     const ok = await copyWordHtmlToClipboard(rawHtml);
     if (ok) {
-      notifyInfo(`生成 .docx 失败（${message}），已改为复制富文本到剪贴板，请在 Word 中按 Ctrl+V 粘贴`);
+      notifyInfo(t('exportAction.docxFallback', { message }));
     } else {
-      notifyError(`生成 .docx 失败：${message}`);
+      notifyError(t('exportAction.docxFailed', { message }));
     }
   } finally {
     dismissNotify(loadingId);
@@ -790,7 +791,7 @@ const exportWord = async (cherry: CherryLikeInstance, fileName: string): Promise
 
 export const runCherryExport = async (cherry: CherryLikeInstance, type: ExportType): Promise<void> => {
   if (!cherry?.previewer) {
-    notifyError('Cherry 实例未就绪，无法导出');
+    notifyError(t('exportAction.instanceNotReady'));
     return;
   }
 
@@ -819,13 +820,13 @@ export const runCherryExport = async (cherry: CherryLikeInstance, type: ExportTy
         await exportWord(cherry, fileName);
         break;
       default:
-        notifyError(`未知导出类型：${type}`);
+        notifyError(t('exportAction.unknownType', { type }));
         return;
     }
     if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
       window.dispatchEvent(new CustomEvent('cherry:export:done', { detail: { type } }));
     }
   } catch (error) {
-    notifyError(`导出失败：${error instanceof Error ? error.message : String(error)}`);
+    notifyError(t('exportAction.failed', { message: error instanceof Error ? error.message : String(error) }));
   }
 };

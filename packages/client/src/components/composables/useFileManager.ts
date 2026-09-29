@@ -11,7 +11,7 @@ import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useContextMenu } from './useContextMenu';
 import { WINDOW_EVENTS } from '../../constants/events';
 import { notifyError, notifyInfo, notifySuccess } from '../../utils/notifications';
-import { MESSAGES } from '../../constants/i18n';
+import { t } from '../../i18n';
 
 // 常量定义
 const STORAGE_KEY_DIRECTORY_MANAGER_EXPANDED = 'cherry-markdown-directory-manager-expanded';
@@ -92,7 +92,7 @@ export function useFileManager(fileStore: FileStoreInstance, folderManagerRef: R
       if (result.success && result.data) {
         await openFile(result.data);
       } else if (result.error) {
-        notifyError(`${MESSAGES.FILE.OPEN_FAILED}: ${result.error}`);
+        notifyError(`${t('file.openFailed')}: ${result.error}`);
       }
     } finally {
       isLoading.value = false;
@@ -109,7 +109,7 @@ export function useFileManager(fileStore: FileStoreInstance, folderManagerRef: R
       }
     } catch (error) {
       notifyError(
-        `${MESSAGES.DIRECTORY.OPEN_FAILED}: ${error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR}`,
+        `${t('directory.openFailed')}: ${error instanceof Error ? error.message : t('common.unknownError')}`,
       );
     } finally {
       isLoading.value = false;
@@ -150,10 +150,10 @@ export function useFileManager(fileStore: FileStoreInstance, folderManagerRef: R
           saveDirectoryManagerExpandedState(false);
         }
       } else {
-        notifyError(`${MESSAGES.FILE.READ_FAILED}: ${result.error}`);
+        notifyError(`${t('file.readFailed')}: ${result.error}`);
       }
     } catch (error) {
-      notifyError(`${MESSAGES.FILE.OPEN_FAILED}: ${error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR}`);
+      notifyError(`${t('file.openFailed')}: ${error instanceof Error ? error.message : t('common.unknownError')}`);
     }
   };
 
@@ -173,11 +173,11 @@ export function useFileManager(fileStore: FileStoreInstance, folderManagerRef: R
   const removeFromRecent = (filePath: string): void => {
     try {
       fileStore.removeRecentFile(filePath);
-      notifySuccess(MESSAGES.FILE_MANAGEMENT.REMOVE_SUCCESS);
+      notifySuccess(t('file.removeSuccess'));
       void refreshDirectories();
     } catch (error) {
       notifyError(
-        `${MESSAGES.FILE_MANAGEMENT.REMOVE_FAILED}: ${error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR}`,
+        `${t('file.removeFailed')}: ${error instanceof Error ? error.message : t('common.unknownError')}`,
       );
     }
   };
@@ -186,11 +186,11 @@ export function useFileManager(fileStore: FileStoreInstance, folderManagerRef: R
   const copyFilePath = async (filePath: string): Promise<void> => {
     try {
       await navigator.clipboard.writeText(filePath);
-      notifyInfo(MESSAGES.CLIPBOARD.COPY_PATH_SUCCESS);
+      notifyInfo(t('file.copyPathSuccess'));
       hideContextMenu();
     } catch (error) {
       notifyError(
-        `${MESSAGES.CLIPBOARD.COPY_PATH_FAILED}: ${error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR}`,
+        `${t('file.copyPathFailed')}: ${error instanceof Error ? error.message : t('common.unknownError')}`,
       );
     }
   };
@@ -213,15 +213,15 @@ export function useFileManager(fileStore: FileStoreInstance, folderManagerRef: R
       hideContextMenu();
     } catch (error) {
       notifyError(
-        `${MESSAGES.EXPLORER.OPEN_FAILED}: ${error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR}`,
+        `${t('file.openExplorerFailed')}: ${error instanceof Error ? error.message : t('common.unknownError')}`,
       );
       // 备选方案：复制文件路径到剪贴板
       try {
         await navigator.clipboard.writeText(filePath);
-        notifyInfo(`${MESSAGES.CLIPBOARD.COPY_PATH_FALLBACK}: ${filePath}`);
+        notifyInfo(`${t('file.copyPathFallback')}: ${filePath}`);
       } catch (clipboardError) {
         notifyError(
-          `${MESSAGES.CLIPBOARD.COPY_PATH_FAILED}: ${clipboardError instanceof Error ? clipboardError.message : MESSAGES.UNKNOWN_ERROR}`,
+          `${t('file.copyPathFailed')}: ${clipboardError instanceof Error ? clipboardError.message : t('common.unknownError')}`,
         );
       }
     }

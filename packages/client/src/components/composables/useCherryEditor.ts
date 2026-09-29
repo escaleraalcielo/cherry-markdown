@@ -1,9 +1,10 @@
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { cherryInstance } from '../CherryMarkdown';
 import type { CherryEditorInstance, CherryEditorMode } from '../editorTypes';
 import { setEditorInstance } from './useEditor';
 import { useImageLightbox, setCurrentLightbox, getCurrentLightbox } from './useImageLightbox';
 import { usePreferencesStore, type EditorMode } from '../../store';
+import type { AppLocale } from '../../i18n';
 
 interface UseCherryEditorOptions {
   onContentChanged: () => void;
@@ -50,10 +51,19 @@ const readPersistedCherryTheme = (): CherryThemeName => {
 
 export function useCherryEditor({ onContentChanged }: UseCherryEditorOptions) {
   const toolbarVisible = ref(true);
+  // 与本文件其余处保持一致：pinia 未就绪时不阻断编辑器初始化
+  let preferences: ReturnType<typeof usePreferencesStore> | null = null;
+  try {
+    preferences = usePreferencesStore();
+  } catch {
+    // pinia 未就绪时忽略，语言同步自动降级为「只用默认值」
+  }
   let editor: CherryEditorInstance | null = null;
   let skipNextChange = true;
   let statusPollTimer: number | undefined;
   let lastKnownEditorMode: EditorMode | null = null;
+  /** 语言同步的 watcher，销毁编辑器时需要停掉 */
+  let stopLocaleWatch: (() => void) | null = null;
 
   const getEditor = (): CherryEditorInstance => {
     if (!editor) {
@@ -74,6 +84,17 @@ export function useCherryEditor({ onContentChanged }: UseCherryEditorOptions) {
 
   const handleThemeChange = (theme: string): void => {
     applyCherryTheme(theme);
+  };
+
+  /**
+   * core 内置 ChangeLocale 工具栏钩子在切换语言后触发的事件。
+   * core 此时已经更新了自身语言并重绘了工具栏，这里只需把语言写回 store，
+   * 由 store 触发整个客户端外壳重新渲染。
+   */
+  const handleAfterChangeLocale = (locale: string): void => {
+    if (!preferences) return;
+    if (locale !== 'zh_CN' && locale !== 'en_US') return;
+    preferences.setLocale(locale as AppLocale);
   };
 
   /**
@@ -168,6 +189,29 @@ export function useCherryEditor({ onContentChanged }: UseCherryEditorOptions) {
         on(event: 'toolbarShow' | 'toolbarHide', handler: () => void): void;
       }
     ).on('toolbarHide', handleToolbarHide);
+
+    // ===== 语言同步（双向，均带等值短路以避免互相触发） =====
+    // 方向一：用户点 core 工具栏的「切换语言」→ core 更新自身语言并重绘工具栏，
+    // 通过 afterChangeLocale 事件把语言写回偏好 store，由 store 带动整个界面重渲染。
+    (
+      instance as unknown as {
+        on(event: 'afterChangeLocale', handler: (locale: string) => void): void;
+      }
+    ).on('afterChangeLocale', handleAfterChangeLocale);
+
+    // 方向二：用户从「设置」里改语言 → 把语言推给 core。
+    // Cherry.setLocale() 不会重绘工具栏（内置 ChangeLocale 钩子会额外调用 resetToolbar），
+    // 因此这里必须补上 resetToolbar，否则工具栏文案会停留在旧语言。
+    stopLocaleWatch = watch(
+      () => preferences?.locale,
+      (locale) => {
+        if (!locale) return;
+        if (instance.options.locale === locale) return;
+        instance.setLocale(locale);
+        instance.resetToolbar('toolbar', instance.options.toolbars?.toolbar || []);
+      },
+      { immediate: true },
+    );
 
     // cherry 初始化时 defaultModel 已根据持久化值设置，但 toolbar 隐藏需要手动达成
     // （初始 defaultModel !== previewOnly 时 cherry 默认显示 toolbar）
@@ -264,6 +308,13 @@ export function useCherryEditor({ onContentChanged }: UseCherryEditorOptions) {
         off?(event: 'toolbarShow' | 'toolbarHide', handler: () => void): void;
       } | null
     )?.off?.('toolbarHide', handleToolbarHide);
+    (
+      editor as unknown as {
+        off?(event: 'afterChangeLocale', handler: (locale: string) => void): void;
+      } | null
+    )?.off?.('afterChangeLocale', handleAfterChangeLocale);
+    stopLocaleWatch?.();
+    stopLocaleWatch = null;
     document.body.removeAttribute(`data-${CHERRY_THEME_DATA_ATTR}`);
     getCurrentLightbox()?.destroy();
     setCurrentLightbox(null);

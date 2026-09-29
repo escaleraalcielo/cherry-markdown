@@ -4,6 +4,13 @@ Excited to hear that you are interested in contributing to this project! Thanks!
 
 The repository-wide contribution flow, branch conventions, Changesets, and Vite+ commands are documented in [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md). This file only records requirements specific to the Tauri client.
 
+### Internationalization
+
+The client UI is bilingual (Simplified Chinese and English). All user-facing text must go through
+the `t()` helper rather than being written inline. If you are adding or changing any visible
+string, read [`./I18N.md`](./I18N.md) first: it documents the locale bundles, the reactivity
+model, the language-switch wiring, and the rules that are easy to break silently.
+
 ### Setup (locally)
 
 **This client project is developed using Node+rust, so you must first ensure that the development environment is correct.**

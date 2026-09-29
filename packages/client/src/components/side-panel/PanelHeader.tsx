@@ -1,4 +1,5 @@
 import { defineComponent, h, type PropType } from 'vue';
+import { t } from '../../i18n';
 import IconTooltip from './IconTooltip';
 import type { PanelHeaderAction } from './types';
 
@@ -31,12 +32,15 @@ export default defineComponent({
         h(
           'div',
           { class: 'header-actions' },
-          props.actions.map((action) =>
-            h(
+          props.actions.map((action) => {
+            const label = t(action.labelKey);
+            const tooltip =
+              action.disabled && action.disabledReasonKey ? t(action.disabledReasonKey) : label;
+            return h(
               IconTooltip,
               {
                 key: action.id,
-                label: action.disabled && action.disabledReason ? action.disabledReason : action.label,
+                label: tooltip,
                 placement: 'bottom',
               },
               {
@@ -45,16 +49,16 @@ export default defineComponent({
                     'button',
                     {
                       class: 'header-action',
-                      title: action.disabled && action.disabledReason ? action.disabledReason : action.label,
-                      'aria-label': action.label,
+                      title: tooltip,
+                      'aria-label': label,
                       disabled: action.disabled,
                       onClick: () => emit('action', action.id),
                     },
                     [h(action.icon, { size: 16 })],
                   ),
               },
-            ),
-          ),
+            );
+          }),
         ),
       ]);
   },

@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { resolveInitialLocale, setActiveLocale, type AppLocale } from '../../i18n';
 
 export type EditorMode = 'edit&preview' | 'editOnly' | 'previewOnly';
 export type WidthMode = 'fixed' | 'auto';
@@ -12,6 +13,8 @@ interface PreferencesState {
   editorMode: EditorMode;
   toolbarVisible: boolean;
   engine: EditorEngine;
+  /** 界面语言；store 是唯一数据源，写入时同步到 i18n 运行时 */
+  locale: AppLocale;
 }
 
 const STORAGE_KEY = 'cherry_markdown_ui_preferences';
@@ -28,6 +31,7 @@ const DEFAULT_STATE: PreferencesState = {
   editorMode: 'edit&preview',
   toolbarVisible: true,
   engine: 'cherry',
+  locale: resolveInitialLocale(),
 };
 
 const isEditorMode = (v: unknown): v is EditorMode => v === 'edit&preview' || v === 'editOnly' || v === 'previewOnly';
@@ -35,6 +39,8 @@ const isEditorMode = (v: unknown): v is EditorMode => v === 'edit&preview' || v 
 const isWidthMode = (v: unknown): v is WidthMode => v === 'fixed' || v === 'auto';
 
 const isEditorEngine = (v: unknown): v is EditorEngine => v === 'cherry' || v === 'milkdown';
+
+const isAppLocale = (v: unknown): v is AppLocale => v === 'zh_CN' || v === 'en_US';
 
 const clampFixedWidth = (v: unknown): number => {
   const n = typeof v === 'number' && Number.isFinite(v) ? v : FIXED_WIDTH_DEFAULT;
@@ -53,6 +59,8 @@ const loadFromStorage = (): PreferencesState => {
       editorMode: isEditorMode(parsed.editorMode) ? parsed.editorMode : DEFAULT_STATE.editorMode,
       toolbarVisible: typeof parsed.toolbarVisible === 'boolean' ? parsed.toolbarVisible : DEFAULT_STATE.toolbarVisible,
       engine: isEditorEngine(parsed.engine) ? parsed.engine : DEFAULT_STATE.engine,
+      // 老版本写入的偏好里没有 locale，此时按系统语言推断一次，之后由用户的选择覆盖
+      locale: isAppLocale(parsed.locale) ? parsed.locale : resolveInitialLocale(),
     };
   } catch (error) {
     console.warn('加载 UI 偏好失败:', error);
@@ -94,6 +102,21 @@ export const usePreferencesStore = defineStore('preferences', {
     setEngine(engine: EditorEngine) {
       this.engine = engine;
       saveToStorage(this.$state);
+    },
+    /**
+     * 设置界面语言。store 是唯一数据源，这里同时把值同步给 i18n 运行时，
+     * 触发所有在渲染期调用 t() 的组件重渲染。
+     */
+    setLocale(locale: AppLocale) {
+      if (!isAppLocale(locale)) return;
+      if (this.locale === locale) {
+        // 仍需同步一次运行时，避免运行时与 store 意外失步
+        setActiveLocale(locale);
+        return;
+      }
+      this.locale = locale;
+      saveToStorage(this.$state);
+      setActiveLocale(locale);
     },
   },
 });

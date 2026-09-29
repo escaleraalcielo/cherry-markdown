@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 import { useImageBedStore, type ImageBedProvider, type ImageBedState } from '../../store';
 
 /**
@@ -36,7 +37,7 @@ const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ''));
-    reader.onerror = () => reject(reader.error ?? new Error('读取文件失败'));
+    reader.onerror = () => reject(reader.error ?? new Error(t('file.readFailed')));
     reader.readAsDataURL(file);
   });
 
@@ -59,10 +60,10 @@ const uploadViaPicgo = async (file: File, endpoint: string): Promise<string> => 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ list: [dataUrl] }),
     });
-    if (!res.ok) throw new Error(`PicGo Server 返回 ${res.status}`);
+    if (!res.ok) throw new Error(t('imageBed.picgoHttp', { status: res.status }));
     const data = (await res.json()) as { success?: boolean; result?: unknown[]; msg?: string };
     if (!data.success || !Array.isArray(data.result) || typeof data.result[0] !== 'string') {
-      throw new Error(data.msg || 'PicGo Server 返回格式异常');
+      throw new Error(data.msg || t('imageBed.picgoBadResponse'));
     }
     return data.result[0];
   } catch (error) {
@@ -74,7 +75,7 @@ const uploadViaPicgo = async (file: File, endpoint: string): Promise<string> => 
 /** Custom uploader: multipart/form-data POST, extract URL via responseUrlPath. */
 const uploadViaCustom = async (file: File, config: ImageBedState['custom']): Promise<string> => {
   try {
-    if (!config.url.trim()) throw new Error('未配置上传 URL');
+    if (!config.url.trim()) throw new Error(t('imageBed.urlNotConfigured'));
     const form = new FormData();
     form.append(config.fieldName || 'file', file);
 
@@ -88,7 +89,7 @@ const uploadViaCustom = async (file: File, config: ImageBedState['custom']): Pro
     });
 
     const res = await fetch(config.url, { method: 'POST', headers, body: form });
-    if (!res.ok) throw new Error(`上传失败，HTTP ${res.status}`);
+    if (!res.ok) throw new Error(t('imageBed.uploadFailedHttp', { status: res.status }));
 
     const contentType = res.headers.get('content-type') || '';
     let url: unknown = '';
@@ -100,7 +101,7 @@ const uploadViaCustom = async (file: File, config: ImageBedState['custom']): Pro
       url = (await res.text()).trim();
     }
     if (typeof url !== 'string' || !url) {
-      throw new Error(`响应中未找到 "${config.responseUrlPath}" 字段`);
+      throw new Error(t('imageBed.fieldNotFound', { path: config.responseUrlPath }));
     }
     return url;
   } catch (error) {
@@ -243,7 +244,9 @@ export function createImageBedOnPaste(): (
     if (typeof asyncCallback !== 'function') return undefined;
 
     const isBatch = images.length > 1;
-    const placeholder = isBatch ? `<<正在上传 ${images.length} 张图片…>>` : `<<正在上传图片…>>`;
+    const placeholder = isBatch
+      ? t('imageBed.uploadingBatch', { count: images.length })
+      : t('imageBed.uploading');
 
     // 并行上传所有图片，全部完成后一次性替换占位
     Promise.all(
@@ -257,12 +260,12 @@ export function createImageBedOnPaste(): (
         const mdText = buildImageMarkdown(results);
         // 即便部分失败（url 为空）也要替换掉占位，避免占位残留
         asyncCallback({
-          mdText: mdText || `<!-- 图片上传失败 -->`,
+          mdText: mdText || t('imageBed.uploadFailedComment'),
         });
       })
       .catch((error) => {
         console.error('[imageBed] 粘贴图片上传失败:', error);
-        asyncCallback({ mdText: `<!-- 图片上传失败: ${(error as Error).message} -->` });
+        asyncCallback({ mdText: t('imageBed.uploadFailedCommentDetail', { message: (error as Error).message }) });
       });
 
     return placeholder;
@@ -284,20 +287,20 @@ export async function testImageBedConnection(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ list: [tinyPng] }),
       });
-      if (!res.ok) return { ok: false, message: `连接失败：HTTP ${res.status}` };
+      if (!res.ok) return { ok: false, message: t('imageBed.testFailedHttp', { status: res.status }) };
       const data = (await res.json()) as { success?: boolean; msg?: string; result?: unknown[] };
       if (data.success && Array.isArray(data.result) && data.result[0]) {
-        return { ok: true, message: `连通成功：${String(data.result[0])}` };
+        return { ok: true, message: t('imageBed.testOk', { value: String(data.result[0]) }) };
       }
-      return { ok: false, message: data.msg || '返回格式异常' };
+      return { ok: false, message: data.msg || t('imageBed.badResponse') };
     }
 
-    if (!state.custom.url.trim()) return { ok: false, message: '请填写上传 URL' };
+    if (!state.custom.url.trim()) return { ok: false, message: t('imageBed.enterUrl') };
     // We do a HEAD to at least verify DNS/URL reachability; many servers reject HEAD though.
     const res = await fetch(state.custom.url, { method: 'HEAD' }).catch(() => null);
-    if (!res) return { ok: false, message: 'URL 无法访问（可能是网络或 CORS 限制）' };
-    return { ok: true, message: `URL 可达（HTTP ${res.status}），实际上传将在插入图片时进行` };
+    if (!res) return { ok: false, message: t('imageBed.urlUnreachable') };
+    return { ok: true, message: t('imageBed.urlReachable', { status: res.status }) };
   } catch (error) {
-    return { ok: false, message: `连接失败：${(error as Error).message}` };
+    return { ok: false, message: t('imageBed.testFailed', { message: (error as Error).message }) };
   }
 }

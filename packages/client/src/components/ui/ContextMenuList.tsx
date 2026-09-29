@@ -1,4 +1,5 @@
 import { computed, defineComponent, h, type PropType } from 'vue';
+import { t } from '../../i18n';
 import type { FileInfo } from '../types';
 
 export default defineComponent({
@@ -24,10 +25,10 @@ export default defineComponent({
     return () =>
       h('div', [
         props.menuType === 'recent'
-          ? h('div', { class: 'menu-item', onClick: () => emit('remove', filePath.value) }, '从列表中移除')
+          ? h('div', { class: 'menu-item', onClick: () => emit('remove', filePath.value) }, t('contextMenu.removeFromList'))
           : null,
-        h('div', { class: 'menu-item', onClick: () => emit('copyPath', filePath.value) }, '复制文件路径'),
-        h('div', { class: 'menu-item', onClick: () => emit('openInExplorer', filePath.value) }, '在资源管理器中打开'),
+        h('div', { class: 'menu-item', onClick: () => emit('copyPath', filePath.value) }, t('contextMenu.copyPath')),
+        h('div', { class: 'menu-item', onClick: () => emit('openInExplorer', filePath.value) }, t('contextMenu.openInExplorer')),
       ]);
   },
 });

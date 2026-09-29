@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { ref } from 'vue';
-import { DIALOGS, MESSAGES } from '../../constants/i18n';
+import { t } from '../../i18n';
 import { SUPPORTED_FILE_EXTENSIONS } from '../../constants/files';
 import { usePreferencesStore, useFileStore } from '../../store';
 import { notifyError, notifyInfo, notifySuccess } from '../../utils/notifications';
@@ -49,7 +49,7 @@ export function useAppFileOperations({
     if (size <= MILKDOWN_MAX_BYTES) return;
     preferences.setEngine('cherry');
     notifyInfo(
-      `文件大小 ${(size / 1024).toFixed(1)}KB 超过 Milkdown 推荐阈值（${MILKDOWN_MAX_BYTES / 1024}KB），已自动切换到 Cherry 引擎。`,
+      t('editor.sizeThresholdWarning', { size: (size / 1024).toFixed(1), max: MILKDOWN_MAX_BYTES / 1024 }),
     );
   };
 
@@ -59,7 +59,7 @@ export function useAppFileOperations({
   };
 
   const saveAsNewMarkdown = async (): Promise<FileOperationResult> => {
-    if (isLoading.value) return { success: false, error: MESSAGES.FILE.USER_CANCELLED };
+    if (isLoading.value) return { success: false, error: t('file.userCancelled') };
     isLoading.value = true;
     try {
       const path = await save({
@@ -72,7 +72,7 @@ export function useAppFileOperations({
       });
 
       if (!path) {
-        return { success: false, error: MESSAGES.FILE.USER_CANCELLED_SAVE };
+        return { success: false, error: t('file.userCancelledSave') };
       }
 
       const normalizedPath = normalizePath(path);
@@ -82,13 +82,13 @@ export function useAppFileOperations({
       fileStore.addRecentFile(normalizedPath);
       fileStore.markSaved(normalizedPath);
       await markClean(normalizedPath);
-      notifySuccess(MESSAGES.FILE.SAVE_AS_SUCCESS);
+      notifySuccess(t('file.saveAsSuccess'));
 
       return { success: true, path: normalizedPath };
     } catch (error) {
-      const message = `${MESSAGES.FILE.SAVE_AS_FAILED}: ${error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR}`;
+      const message = `${t('file.saveAsFailed')}: ${error instanceof Error ? error.message : t('common.unknownError')}`;
       notifyError(message);
-      return { success: false, error: error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR };
+      return { success: false, error: error instanceof Error ? error.message : t('common.unknownError') };
     } finally {
       isLoading.value = false;
     }
@@ -104,12 +104,12 @@ export function useAppFileOperations({
       await writeTextFile(normalizedPath, getMarkdown());
       fileStore.markSaved(normalizedPath);
       await markClean(normalizedPath);
-      notifySuccess(MESSAGES.FILE.SAVE_SUCCESS);
+      notifySuccess(t('file.saveSuccess'));
       return { success: true, path: normalizedPath };
     } catch (error) {
-      const message = `${MESSAGES.FILE.SAVE_FAILED}: ${error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR}`;
+      const message = `${t('file.saveFailed')}: ${error instanceof Error ? error.message : t('common.unknownError')}`;
       notifyError(message);
-      return { success: false, error: error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR };
+      return { success: false, error: error instanceof Error ? error.message : t('common.unknownError') };
     }
   };
 
@@ -126,9 +126,9 @@ export function useAppFileOperations({
   };
 
   const openFile = async (): Promise<FileOperationResult> => {
-    if (isLoading.value) return { success: false, error: DIALOGS.CANCELLED_UNSAVED };
+    if (isLoading.value) return { success: false, error: t('unsavedDialog.cancelled') };
     if (!(await canLeaveCurrentFile())) {
-      return { success: false, error: DIALOGS.CANCELLED_UNSAVED };
+      return { success: false, error: t('unsavedDialog.cancelled') };
     }
 
     isLoading.value = true;
@@ -145,7 +145,7 @@ export function useAppFileOperations({
       });
 
       if (path === null) {
-        return { success: false, error: MESSAGES.FILE.USER_CANCELLED_SELECT };
+        return { success: false, error: t('file.userCancelledSelect') };
       }
 
       const normalizedPath = normalizePath(path);
@@ -161,18 +161,18 @@ export function useAppFileOperations({
 
       return { success: true, path: normalizedPath };
     } catch (error) {
-      const message = `${MESSAGES.FILE.OPEN_FAILED}: ${error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR}`;
+      const message = `${t('file.openFailed')}: ${error instanceof Error ? error.message : t('common.unknownError')}`;
       notifyError(message);
-      return { success: false, error: error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR };
+      return { success: false, error: error instanceof Error ? error.message : t('common.unknownError') };
     } finally {
       isLoading.value = false;
     }
   };
 
   const openFilePath = async (filePath: string): Promise<FileOperationResult> => {
-    if (isLoading.value) return { success: false, error: DIALOGS.CANCELLED_UNSAVED };
+    if (isLoading.value) return { success: false, error: t('unsavedDialog.cancelled') };
     if (!(await canLeaveCurrentFile())) {
-      return { success: false, error: DIALOGS.CANCELLED_UNSAVED };
+      return { success: false, error: t('unsavedDialog.cancelled') };
     }
 
     isLoading.value = true;
@@ -190,9 +190,9 @@ export function useAppFileOperations({
 
       return { success: true, path: normalizedPath };
     } catch (error) {
-      const message = `${MESSAGES.FILE.OPEN_FAILED}: ${error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR}`;
+      const message = `${t('file.openFailed')}: ${error instanceof Error ? error.message : t('common.unknownError')}`;
       notifyError(message);
-      return { success: false, error: error instanceof Error ? error.message : MESSAGES.UNKNOWN_ERROR };
+      return { success: false, error: error instanceof Error ? error.message : t('common.unknownError') };
     } finally {
       isLoading.value = false;
     }
@@ -251,7 +251,7 @@ export function useAppFileOperations({
   const handleSaveFromToolbar = async (): Promise<void> => {
     const result = await saveMarkdown();
     if (!result.success && result.error) {
-      notifyError(`${MESSAGES.FILE.SAVE_FAILED}: ${result.error}`);
+      notifyError(`${t('file.saveFailed')}: ${result.error}`);
     }
   };
 

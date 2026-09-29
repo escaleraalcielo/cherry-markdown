@@ -1,7 +1,8 @@
 import { readDir, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import type { DirectoryNode, FileOperationResult, DirectoryStructureResult } from './types';
-import { SUPPORTED_FILE_EXTENSIONS, MAX_DIRECTORY_DEPTH, DEFAULT_FILE_CONTENT } from '../constants/files';
+import { SUPPORTED_FILE_EXTENSIONS, MAX_DIRECTORY_DEPTH, getDefaultFileContent } from '../constants/files';
+import { t, getActiveLocale, toBcp47 } from '../i18n';
 
 /**
  * Detect whether the current runtime is on Windows.
@@ -147,7 +148,7 @@ export const loadDirectoryStructure = async (
     console.error('加载目录结构失败:', error);
     return {
       success: false,
-      error: `加载目录结构失败: ${error instanceof Error ? error.message : String(error)}`,
+      error: `${t('directory.loadFailed')}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 };
@@ -165,21 +166,21 @@ export const createNewFile = async (): Promise<FileOperationResult<string>> => {
     });
 
     if (!selected) {
-      return { success: false, error: '用户取消操作' };
+      return { success: false, error: t('file.userCancelled') };
     }
 
     const rawFilePath = Array.isArray(selected) ? selected[0] : selected;
     const filePath = normalizePath(rawFilePath);
 
     // 创建空文件
-    await writeTextFile(filePath, DEFAULT_FILE_CONTENT);
+    await writeTextFile(filePath, getDefaultFileContent());
 
     return { success: true, data: filePath };
   } catch (error) {
     console.error('创建新文件失败:', error);
     return {
       success: false,
-      error: `创建新文件失败: ${error instanceof Error ? error.message : String(error)}`,
+      error: `${t('file.createFailed')}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 };
@@ -198,7 +199,7 @@ export const openExistingFile = async (): Promise<FileOperationResult<string>> =
     });
 
     if (!selected) {
-      return { success: false, error: '用户取消操作' };
+      return { success: false, error: t('file.userCancelled') };
     }
 
     const rawFilePath = Array.isArray(selected) ? selected[0] : selected;
@@ -208,7 +209,7 @@ export const openExistingFile = async (): Promise<FileOperationResult<string>> =
     console.error('打开文件失败:', error);
     return {
       success: false,
-      error: `打开文件失败: ${error instanceof Error ? error.message : String(error)}`,
+      error: `${t('file.openFailed')}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 };
@@ -222,7 +223,7 @@ export const openDirectoryDialog = async (): Promise<FileOperationResult<string>
     });
 
     if (!selected) {
-      return { success: false, error: '用户取消操作' };
+      return { success: false, error: t('file.userCancelled') };
     }
 
     const rawDirPath = Array.isArray(selected) ? selected[0] : selected;
@@ -232,7 +233,7 @@ export const openDirectoryDialog = async (): Promise<FileOperationResult<string>
     console.error('打开目录失败:', error);
     return {
       success: false,
-      error: `打开目录失败: ${error instanceof Error ? error.message : String(error)}`,
+      error: `${t('directory.openFailed')}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 };
@@ -246,7 +247,7 @@ export const readFileContent = async (filePath: string): Promise<FileOperationRe
     console.error('读取文件失败:', error);
     return {
       success: false,
-      error: `读取文件失败: ${error instanceof Error ? error.message : String(error)}`,
+      error: `${t('file.readFailed')}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 };
@@ -276,23 +277,26 @@ export const formatTimestamp = (timestamp: number): string => {
   const DAY = 24 * HOUR;
   const WEEK = 7 * DAY;
 
+  // Intl.RelativeTimeFormat 直接产出当前语言的表述，无需手写「刚刚 / N 分钟前」
+  const rtf = new Intl.RelativeTimeFormat(toBcp47(getActiveLocale()), { numeric: 'auto' });
+
   if (diff < MINUTE) {
-    return '刚刚';
+    return rtf.format(0, 'second');
   }
 
   if (diff < HOUR) {
-    return `${Math.floor(diff / MINUTE)}分钟前`;
+    return rtf.format(-Math.floor(diff / MINUTE), 'minute');
   }
 
   if (diff < DAY) {
-    return `${Math.floor(diff / HOUR)}小时前`;
+    return rtf.format(-Math.floor(diff / HOUR), 'hour');
   }
 
   if (diff < WEEK) {
-    return `${Math.floor(diff / DAY)}天前`;
+    return rtf.format(-Math.floor(diff / DAY), 'day');
   }
 
-  return new Date(timestamp).toLocaleDateString();
+  return new Intl.DateTimeFormat(toBcp47(getActiveLocale())).format(new Date(timestamp));
 };
 
 // 防抖函数

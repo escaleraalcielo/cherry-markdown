@@ -1,4 +1,5 @@
 import { computed, defineComponent, h, ref } from 'vue';
+import { t, getActiveLocale, toBcp47 } from '../i18n';
 import { useFileStore } from '../store';
 import ContextMenu from './ui/ContextMenu';
 import { useFileManager } from './composables/useFileManager';
@@ -16,6 +17,10 @@ const formatDateKey = (time: FileInfo['lastAccessed']): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
+/**
+ * 分组标题：今天 / 昨天用 t()，其余交给 Intl.DateTimeFormat 按当前语言格式化，
+ * 这样中英文都不需要手写「年月日 + 星期」数组。
+ */
 const formatDateLabel = (dateKey: string): string => {
   const [year, month, day] = dateKey.split('-').map(Number);
   const date = new Date(year, month - 1, day);
@@ -23,11 +28,15 @@ const formatDateLabel = (dateKey: string): string => {
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
 
-  if (date.toDateString() === today.toDateString()) return '今天';
-  if (date.toDateString() === yesterday.toDateString()) return '昨天';
+  if (date.toDateString() === today.toDateString()) return t('recent.today');
+  if (date.toDateString() === yesterday.toDateString()) return t('recent.yesterday');
 
-  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-  return `${year}年${String(month).padStart(2, '0')}月${String(day).padStart(2, '0')}日 ${weekdays[date.getDay()]}`;
+  return new Intl.DateTimeFormat(toBcp47(getActiveLocale()), {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short',
+  }).format(date);
 };
 
 const formatDirectory = (path: string): string => {
@@ -70,7 +79,7 @@ export default defineComponent({
       }
       return Array.from(groups.entries()).map(([dateKey, files]) => ({
         dateKey,
-        label: dateKey === 'draft' ? '临时文件' : formatDateLabel(dateKey),
+        label: dateKey === 'draft' ? t('recent.drafts') : formatDateLabel(dateKey),
         files,
       }));
     });
@@ -99,8 +108,8 @@ export default defineComponent({
       h('div', { class: 'recent-panel' }, [
         !sortedRecentFiles.value.length && !fileStore.untitledDraft
           ? h('div', { class: 'empty' }, [
-              h('p', '暂无最近访问文件'),
-              h('button', { type: 'button', onClick: openRecentFile }, '打开文件'),
+              h('p', t('recent.empty')),
+              h('button', { type: 'button', onClick: openRecentFile }, t('file.openFile')),
             ])
           : h(
               'div',
@@ -109,7 +118,7 @@ export default defineComponent({
                 h('section', { key: group.dateKey, class: 'recent-group' }, [
                   h('div', { class: 'recent-group-title' }, [
                     h('span', group.label),
-                    h('span', `${group.files.length} 个文件`),
+                    h('span', t('recent.fileCount', { count: group.files.length })),
                   ]),
                   h(
                     'ul',
@@ -119,7 +128,7 @@ export default defineComponent({
                         {
                           key: file.path,
                           class: { active: isActiveFile(file), draft: file.isDraft },
-                          title: file.isDraft ? '未保存的新建文件，保存后会写入磁盘' : file.path,
+                          title: file.isDraft ? t('file.draftTooltip') : file.path,
                           onClick: () => {
                             if (!file.isDraft) void openRecent(file.path);
                           },
@@ -132,12 +141,12 @@ export default defineComponent({
                         [
                           h('div', { class: 'file-row' }, [
                             h('span', { class: 'file-name' }, file.name),
-                            h('span', { class: 'file-time' }, file.isDraft ? '未保存' : formatTime(file.lastAccessed)),
+                            h('span', { class: 'file-time' }, file.isDraft ? t('common.unsaved') : formatTime(file.lastAccessed)),
                           ]),
                           h(
                             'div',
                             { class: 'file-path' },
-                            file.isDraft ? '临时文档 - 保存后写入磁盘' : formatDirectory(file.path),
+                            file.isDraft ? t('file.draftPath') : formatDirectory(file.path),
                           ),
                         ],
                       ),

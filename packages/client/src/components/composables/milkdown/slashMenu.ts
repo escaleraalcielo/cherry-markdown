@@ -12,6 +12,7 @@ import {
 } from '@milkdown/kit/preset/commonmark';
 import { insertTableCommand } from '@milkdown/kit/preset/gfm';
 import { slashFactory, SlashProvider } from '@milkdown/kit/plugin/slash';
+import { t } from '../../../i18n';
 
 /**
  * 斜杠菜单（Slash Menu）
@@ -28,7 +29,8 @@ export const slashMenu = slashFactory('milkdown-slash');
 
 interface SlashItem {
   id: string;
-  title: string;
+  /** i18n key；展示文案在构建菜单时用 t() 取，不能存成已翻译的字符串 */
+  titleKey: string;
   desc: string;
   icon: string;
   keywords: string[];
@@ -49,7 +51,7 @@ function callCommand(ctx: Ctx, key: unknown, payload?: unknown): void {
 const SLASH_ITEMS: SlashItem[] = [
   {
     id: 'h1',
-    title: '一级标题',
+    titleKey: 'milkdown.h1',
     desc: 'Heading 1 · #',
     icon: 'H1',
     keywords: ['h1', 'heading1', 'title', '标题', 'yijibiaoti'],
@@ -57,7 +59,7 @@ const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: 'h2',
-    title: '二级标题',
+    titleKey: 'milkdown.h2',
     desc: 'Heading 2 · ##',
     icon: 'H2',
     keywords: ['h2', 'heading2', 'ejibiaoti'],
@@ -65,7 +67,7 @@ const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: 'h3',
-    title: '三级标题',
+    titleKey: 'milkdown.h3',
     desc: 'Heading 3 · ###',
     icon: 'H3',
     keywords: ['h3', 'heading3', 'sanjibiaoti'],
@@ -73,7 +75,7 @@ const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: 'ul',
-    title: '无序列表',
+    titleKey: 'milkdown.bulletList',
     desc: 'Bulleted list',
     icon: '•',
     keywords: ['ul', 'list', 'bullet', 'liebiao', 'wuxuliebiao'],
@@ -81,7 +83,7 @@ const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: 'ol',
-    title: '有序列表',
+    titleKey: 'milkdown.orderedList',
     desc: 'Numbered list',
     icon: '1.',
     keywords: ['ol', 'ordered', 'number', 'youxuliebiao'],
@@ -89,7 +91,7 @@ const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: 'quote',
-    title: '引用',
+    titleKey: 'milkdown.quote',
     desc: 'Blockquote',
     icon: '❞',
     keywords: ['quote', 'blockquote', 'yinyong'],
@@ -97,7 +99,7 @@ const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: 'code',
-    title: '代码块',
+    titleKey: 'milkdown.codeBlock',
     desc: 'Code block',
     icon: '</>',
     keywords: ['code', 'codeblock', 'daimakuai'],
@@ -105,7 +107,7 @@ const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: 'hr',
-    title: '分割线',
+    titleKey: 'milkdown.divider',
     desc: 'Horizontal rule',
     icon: '—',
     keywords: ['hr', 'divider', 'fengexian'],
@@ -113,7 +115,7 @@ const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: 'table',
-    title: '表格',
+    titleKey: 'milkdown.table',
     desc: 'Insert table (3x3)',
     icon: '⊞',
     keywords: ['table', 'biaoge'],
@@ -125,7 +127,8 @@ function filterItems(query: string): SlashItem[] {
   const q = query.trim().toLowerCase();
   if (!q) return SLASH_ITEMS;
   return SLASH_ITEMS.filter((it) => {
-    if (it.title.includes(q)) return true;
+    // 关键词始终包含中文/拼音，英文界面下中文输入同样能命中
+    if (t(it.titleKey).includes(q) || it.keywords.some((k) => k.includes(q))) return true;
     return it.keywords.some((k) => k.includes(q));
   });
 }
@@ -175,7 +178,7 @@ export function configureSlashMenu(ctx: Ctx): {
     if (filtered.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'milkdown-slash-menu-empty';
-      empty.textContent = '未匹配到命令';
+      empty.textContent = t('milkdown.noMatch');
       dom.appendChild(empty);
       return;
     }
@@ -191,7 +194,7 @@ export function configureSlashMenu(ctx: Ctx): {
           <span class="milkdown-slash-item-desc"></span>
         </span>
       `;
-      (el.querySelector('.milkdown-slash-item-title') as HTMLElement).textContent = item.title;
+      (el.querySelector('.milkdown-slash-item-title') as HTMLElement).textContent = t(item.titleKey);
       (el.querySelector('.milkdown-slash-item-desc') as HTMLElement).textContent = item.desc;
       // 使用 mousedown 直接触发命令：
       // 1) preventDefault 阻止 editor 失焦 —— 保证 SlashProvider.getContent

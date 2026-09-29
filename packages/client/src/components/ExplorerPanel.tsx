@@ -1,4 +1,5 @@
 import { defineComponent, h, nextTick, ref } from 'vue';
+import { t } from '../i18n';
 import { useDirectoryStore, useFileStore } from '../store';
 import { notifyInfo } from '../utils/notifications';
 import { loadDirectoryStructure, openDirectoryDialog } from './fileUtils';
@@ -116,13 +117,13 @@ export default defineComponent({
     const revealCurrentFile = async (): Promise<void> => {
       const currentPath = currentFilePath.value;
       if (!currentPath) {
-        notifyInfo('当前没有打开的文件');
+        notifyInfo(t('explorer.noOpenFile'));
         return;
       }
 
       const target = findNodePath(nodes.value, currentPath);
       if (!target) {
-        notifyInfo('当前文件不在已打开目录中');
+        notifyInfo(t('explorer.fileNotInDirectory'));
         return;
       }
 
@@ -145,20 +146,20 @@ export default defineComponent({
       if (!draft) return null;
 
       return h('section', { class: 'draft-section' }, [
-        h('div', { class: 'recent-group-title' }, [h('span', '临时文件'), h('span', '未保存')]),
+        h('div', { class: 'recent-group-title' }, [h('span', t('recent.drafts')), h('span', t('common.unsaved'))]),
         h('ul', { class: 'draft-list' }, [
           h(
             'li',
             {
               class: ['draft-file', { active: !currentFilePath.value }],
-              title: '未保存的新建文件，保存后会写入磁盘',
+              title: t('file.draftTooltip'),
             },
             [
               h('div', { class: 'file-row' }, [
                 h('span', { class: 'file-name' }, draft.name),
-                h('span', { class: 'file-time' }, '未保存'),
+                h('span', { class: 'file-time' }, t('common.unsaved')),
               ]),
-              h('div', { class: 'file-path' }, '临时文档 - 保存后写入磁盘'),
+              h('div', { class: 'file-path' }, t('file.draftPath')),
             ],
           ),
         ]),
@@ -170,13 +171,13 @@ export default defineComponent({
 
     const renderBody = () => {
       if (loading.value) {
-        return h('div', { class: 'empty-state' }, '加载中...');
+        return h('div', { class: 'empty-state' }, t('common.loading'));
       }
 
       if (!nodes.value.length && !fileStore.untitledDraft) {
         return h('div', { class: 'empty-state actionable' }, [
-          h('p', currentDirPath.value ? '当前目录没有可编辑文件' : '请选择一个工作目录'),
-          h('button', { type: 'button', onClick: openDirectory }, '打开目录'),
+          h('p', currentDirPath.value ? t('explorer.noEditableFiles') : t('explorer.selectDirectory')),
+          h('button', { type: 'button', onClick: openDirectory }, t('explorer.openDirectory')),
         ]);
       }
 
@@ -199,7 +200,7 @@ export default defineComponent({
         h('div', { class: 'path-bar' }, [
           currentDirPath.value
             ? h('span', { class: 'path-text', title: currentDirPath.value }, currentDirPath.value)
-            : h('span', { class: 'path-placeholder' }, '未选择目录'),
+            : h('span', { class: 'path-placeholder' }, t('explorer.noDirectorySelected')),
         ]),
         renderBody(),
         contextMenu.value.visible
